@@ -221,3 +221,15 @@ If the configuration file is invalid:
 ```
 
 These errors exit with code `1`. Fix the `.ghorgsync` file and re-run.
+
+### Repositories with Submodules
+
+Repositories that contain git submodules are handled automatically. On clone, submodules are initialized via `--recurse-submodules`. For existing repositories, `git submodule update --init --recursive` is run after every fetch so that uninitialized submodule directories do not appear as untracked files and cause a false dirty report.
+
+If a submodule remote is unreachable, the repository is reported as a `submodule-error`:
+
+```
+  repo  my-app  [submodule-error] git submodule update: ...
+```
+
+Fix the underlying submodule remote issue (network access, SSH keys, token scope) and re-run.

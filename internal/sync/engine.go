@@ -56,6 +56,14 @@ func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 		return result
 	}
 
+	// Initialize and update submodules to avoid false dirty state from
+	// uninitialized submodule directories.
+	if err := e.Git.SubmoduleUpdate(repoDir); err != nil {
+		result.Action = model.ActionSubmoduleError
+		result.Error = err
+		return result
+	}
+
 	// Get current branch
 	branch, err := e.Git.CurrentBranch(repoDir)
 	if err != nil {
@@ -101,6 +109,11 @@ func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 		result.Error = err
 		return result
 	}
+
+	// Update submodule pointers after pull to keep them in sync with the new commits.
+	// This is non-fatal: if submodule update fails after a successful pull, we still
+	// report the pull result and the error will surface on the next sync cycle.
+	_ = e.Git.SubmoduleUpdate(repoDir)
 
 	result.Updated = changed
 

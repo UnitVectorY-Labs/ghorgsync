@@ -180,7 +180,7 @@ func handleResult(printer *output.Printer, result model.RepoResult, summary *mod
 		summary.BranchDrift++
 	case model.ActionAlreadyCurrent:
 		printer.Verbose("%s is already up to date", result.Name)
-	case model.ActionCloneError, model.ActionFetchError, model.ActionCheckoutError, model.ActionPullError:
+	case model.ActionCloneError, model.ActionFetchError, model.ActionCheckoutError, model.ActionPullError, model.ActionSubmoduleError:
 		printer.RepoError(result.Name, result.Action.String(), result.Error)
 		summary.Errors++
 	}

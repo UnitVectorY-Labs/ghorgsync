@@ -13,6 +13,7 @@ import (
 type GitRunner interface {
 	Clone(url, dest string) error
 	Fetch(repoDir string) error
+	SubmoduleUpdate(repoDir string) error
 	CurrentBranch(repoDir string) (string, error)
 	IsDirty(repoDir string) (bool, []model.DirtyFile, error)
 	DiffStats(repoDir string) (int, int, error) // additions, deletions
@@ -25,7 +26,7 @@ type GitRunner interface {
 type ExecGitRunner struct{}
 
 func (g *ExecGitRunner) Clone(url, dest string) error {
-	cmd := exec.Command("git", "clone", url, dest)
+	cmd := exec.Command("git", "clone", "--recurse-submodules", url, dest)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git clone: %s: %w", strings.TrimSpace(string(out)), err)
@@ -38,6 +39,15 @@ func (g *ExecGitRunner) Fetch(repoDir string) error {
 	out, err := cmd.CombinedOutput()
 	if err != nil {
 		return fmt.Errorf("git fetch: %s: %w", strings.TrimSpace(string(out)), err)
+	}
+	return nil
+}
+
+func (g *ExecGitRunner) SubmoduleUpdate(repoDir string) error {
+	cmd := exec.Command("git", "-C", repoDir, "submodule", "update", "--init", "--recursive")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("git submodule update: %s: %w", strings.TrimSpace(string(out)), err)
 	}
 	return nil
 }

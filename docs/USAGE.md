@@ -98,13 +98,15 @@ When invoked, `ghorgsync` performs the following steps:
 For each included repository that exists locally:
 
 1. **Fetch** — always performed (safe operation).
-2. **Check dirty state** — detects staged changes, unstaged changes, and untracked files.
-3. **If dirty:**
+2. **Submodule initialization** — `git submodule update --init --recursive` is run after every fetch to initialize any uninitialized submodules, preventing them from appearing as untracked files and causing a false dirty state.
+3. **Check dirty state** — detects staged changes, unstaged changes, and untracked files.
+4. **If dirty:**
    - Do not checkout or pull.
    - Report the dirty state with current branch, default branch, changed files, and line counts.
-4. **If clean:**
+5. **If clean:**
    - If not on the default branch, checkout the default branch (branch drift correction).
    - Pull with fast-forward-only semantics (`--ff-only`).
+   - Run `git submodule update --init --recursive` again to update submodule pointers to match any new commits brought in by the pull.
    - Report whether the repo was updated or already current.
 
 ### Non-Destructive Guarantees
@@ -115,6 +117,17 @@ For each included repository that exists locally:
 - **Never discards local changes** — dirty repos are skipped for checkout/pull operations.
 - **Never runs destructive git commands** — no `git reset --hard`, no `git clean -fd`, no force checkouts.
 - `fetch` is always considered safe and is always performed.
+- `git submodule update --init --recursive` (without `--force`) is safe and will not overwrite local changes inside submodule directories.
+
+## Submodule Support
+
+`ghorgsync` handles repositories that contain git submodules:
+
+- **Clone** — new repositories are cloned with `--recurse-submodules` so submodules are initialized immediately.
+- **Existing repositories** — `git submodule update --init --recursive` is run after every fetch, before the dirty check. This ensures that uninitialized submodule directories are initialized and do not appear as untracked files causing a false dirty state.
+- **After pull** — `git submodule update --init --recursive` is run again after a successful pull to update submodule pointers to the commits referenced by the new parent-repo state.
+
+If submodule initialization fails (for example, due to a network error fetching a submodule remote), the error is reported as a `submodule-error` and processing of that repository stops. Other repositories continue normally.
 
 ## Output Semantics
 

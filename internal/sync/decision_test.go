@@ -121,3 +121,21 @@ func TestParseGitStatus_MixedFiles(t *testing.T) {
 		t.Fatalf("expected 3 files, got %d", len(files))
 	}
 }
+
+func TestParseGitStatus_UninitializedSubmodule(t *testing.T) {
+	// An uninitialized submodule shows as "?? submodule-dir/" in git status --porcelain.
+	// Once initialized via `git submodule update --init`, it disappears from status output.
+	files := ParseGitStatus("?? vendor/some-lib/\n")
+	if len(files) != 1 {
+		t.Fatalf("expected 1 file, got %d", len(files))
+	}
+	if files[0].Staged {
+		t.Error("uninitialized submodule should not be staged")
+	}
+	if !files[0].Unstaged {
+		t.Error("uninitialized submodule should be unstaged")
+	}
+	if files[0].Path != "vendor/some-lib/" {
+		t.Errorf("expected vendor/some-lib/, got %s", files[0].Path)
+	}
+}
