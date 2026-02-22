@@ -58,28 +58,9 @@ func (g *ExecGitRunner) IsDirty(repoDir string) (bool, []model.DirtyFile, error)
 	if err != nil {
 		return false, nil, fmt.Errorf("git status: %w", err)
 	}
-	output := strings.TrimSpace(string(out))
-	if output == "" {
+	files := ParseGitStatus(string(out))
+	if len(files) == 0 {
 		return false, nil, nil
-	}
-
-	var files []model.DirtyFile
-	for _, line := range strings.Split(output, "\n") {
-		if len(line) < 4 {
-			continue
-		}
-		x := line[0] // staged status
-		y := line[1] // unstaged status
-		path := strings.TrimSpace(line[3:])
-
-		f := model.DirtyFile{Path: path}
-		if x != ' ' && x != '?' {
-			f.Staged = true
-		}
-		if y != ' ' || x == '?' {
-			f.Unstaged = true
-		}
-		files = append(files, f)
 	}
 	return true, files, nil
 }

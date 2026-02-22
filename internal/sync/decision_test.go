@@ -95,6 +95,9 @@ func TestParseGitStatus_UnstagedFile(t *testing.T) {
 	if !files[0].Unstaged {
 		t.Error("expected unstaged")
 	}
+	if files[0].Path != "file.go" {
+		t.Errorf("expected file.go, got %s", files[0].Path)
+	}
 }
 
 func TestParseGitStatus_UntrackedFile(t *testing.T) {
