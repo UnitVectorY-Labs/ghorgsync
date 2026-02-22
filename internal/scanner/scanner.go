@@ -48,9 +48,11 @@ func ScanDirectory(dir string, includedRepos []model.RepoInfo, excludedNames []s
 
 	for _, entry := range entries {
 		name := entry.Name()
-		// Skip hidden files/directories (starting with .)
+		// Skip hidden files/directories (starting with .) unless they are a managed repo
 		if len(name) > 0 && name[0] == '.' {
-			continue
+			if _, ok := includedMap[name]; !ok {
+				continue
+			}
 		}
 		// Only consider directories
 		if !entry.IsDir() {
