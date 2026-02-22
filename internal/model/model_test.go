@@ -35,6 +35,7 @@ func TestRepoActionString(t *testing.T) {
 		{ActionFetchError, "fetch-error"},
 		{ActionCheckoutError, "checkout-error"},
 		{ActionPullError, "pull-error"},
+		{ActionSubmoduleError, "submodule-error"},
 		{RepoAction(99), "unknown"},
 	}
 	for _, tt := range tests {

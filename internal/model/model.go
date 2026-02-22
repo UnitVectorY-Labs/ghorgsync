@@ -48,6 +48,7 @@ const (
 	ActionFetchError               // Fetch failed
 	ActionCheckoutError            // Checkout failed
 	ActionPullError                // Pull failed
+	ActionSubmoduleError           // Submodule update failed
 )
 
 // String returns a human-readable name for the action.
@@ -73,6 +74,8 @@ func (a RepoAction) String() string {
 		return "checkout-error"
 	case ActionPullError:
 		return "pull-error"
+	case ActionSubmoduleError:
+		return "submodule-error"
 	default:
 		return "unknown"
 	}
