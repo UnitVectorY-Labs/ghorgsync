@@ -95,7 +95,8 @@ type RepoResult struct {
 	DirtyFiles    []DirtyFile
 	Additions     int
 	Deletions     int
-	BranchDrift   bool // true if current != default branch
+	BranchDrift   bool // true if current != default branch at start
+	Updated       bool // true if pull brought new changes
 }
 
 // LocalEntry represents a classified local directory entry.

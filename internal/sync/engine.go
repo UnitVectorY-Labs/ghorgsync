@@ -102,9 +102,11 @@ func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 		return result
 	}
 
+	result.Updated = changed
+
 	if changed {
 		if result.BranchDrift {
-			result.Action = model.ActionBranchDrift // drift + updated
+			result.Action = model.ActionBranchDrift
 		} else {
 			result.Action = model.ActionUpdated
 		}

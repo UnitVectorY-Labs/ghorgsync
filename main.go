@@ -173,8 +173,8 @@ func handleResult(printer *output.Printer, result model.RepoResult, summary *mod
 		printer.RepoDirty(result.Name, result.CurrentBranch, result.DefaultBranch, files, result.Additions, result.Deletions)
 		summary.Dirty++
 	case model.ActionBranchDrift:
-		printer.RepoBranchDrift(result.Name, result.CurrentBranch, result.DefaultBranch, result.BranchDrift)
-		if result.BranchDrift {
+		printer.RepoBranchDrift(result.Name, result.CurrentBranch, result.DefaultBranch, result.Updated)
+		if result.Updated {
 			summary.Updated++
 		}
 		summary.BranchDrift++
