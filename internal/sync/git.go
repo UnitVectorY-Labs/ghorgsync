@@ -3,6 +3,7 @@ package sync
 import (
 	"fmt"
 	"os/exec"
+	"strconv"
 	"strings"
 
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/model"
@@ -114,14 +115,14 @@ func parseNumstat(output string) (int, int) {
 		}
 		// Binary files show "-" instead of numbers
 		if fields[0] != "-" {
-			var a int
-			fmt.Sscanf(fields[0], "%d", &a)
-			adds += a
+			if a, err := strconv.Atoi(fields[0]); err == nil {
+				adds += a
+			}
 		}
 		if fields[1] != "-" {
-			var d int
-			fmt.Sscanf(fields[1], "%d", &d)
-			dels += d
+			if d, err := strconv.Atoi(fields[1]); err == nil {
+				dels += d
+			}
 		}
 	}
 	return adds, dels

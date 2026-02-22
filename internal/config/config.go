@@ -14,6 +14,9 @@ type Config struct {
 	IncludePublic  *bool    `yaml:"include_public"`
 	IncludePrivate *bool    `yaml:"include_private"`
 	ExcludeRepos   []string `yaml:"exclude_repos"`
+
+	// compiledExcludes caches compiled regex patterns for ExcludeRepos.
+	compiledExcludes []*regexp.Regexp
 }
 
 // Load reads a YAML configuration file from the given path and returns a parsed Config.
@@ -43,9 +46,11 @@ func (c *Config) Validate() error {
 	}
 
 	for _, pattern := range c.ExcludeRepos {
-		if _, err := regexp.Compile(pattern); err != nil {
+		re, err := regexp.Compile(pattern)
+		if err != nil {
 			return fmt.Errorf("invalid exclude_repos pattern %q: %w", pattern, err)
 		}
+		c.compiledExcludes = append(c.compiledExcludes, re)
 	}
 
 	return nil
@@ -65,6 +70,16 @@ func (c *Config) ShouldIncludePrivate() bool {
 
 // IsExcluded checks whether the given repository name matches any pattern in ExcludeRepos.
 func (c *Config) IsExcluded(repoName string) bool {
+	// Use cached compiled patterns if available (after Validate has been called)
+	if len(c.compiledExcludes) > 0 {
+		for _, re := range c.compiledExcludes {
+			if re.MatchString(repoName) {
+				return true
+			}
+		}
+		return false
+	}
+	// Fallback: compile on the fly (before Validate is called)
 	for _, pattern := range c.ExcludeRepos {
 		re, err := regexp.Compile(pattern)
 		if err != nil {
