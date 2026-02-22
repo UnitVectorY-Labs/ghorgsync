@@ -1,7 +1,5 @@
 # ghorgsync
 
-[![GitHub release](https://img.shields.io/github/release/UnitVectorY-Labs/ghorgsync.svg)](https://github.com/UnitVectorY-Labs/ghorgsync/releases/latest)
-
 Clone and update all organization repositories in one folder, with clean-state and branch audits plus warnings for stray content.
 
 ## Why ghorgsync?
