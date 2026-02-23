@@ -110,11 +110,15 @@ func main() {
 	summary.ExcludedButPresent = len(scanResult.ExcludedButPresent)
 	summary.Errors = len(scanResult.Collisions)
 
+	repoWorkTotal := len(scanResult.ManagedMissing) + len(scanResult.ManagedFound)
+	printer.StartRepoProgress(repoWorkTotal)
+
 	// Clone missing repos
 	for _, name := range scanResult.ManagedMissing {
 		repo := repoMap[name]
 		result := eng.CloneRepo(repo)
 		handleResult(printer, result, &summary)
+		printer.AdvanceRepoProgress()
 	}
 
 	// Process existing repos
@@ -122,7 +126,10 @@ func main() {
 		repo := repoMap[name]
 		result := eng.ProcessRepo(repo)
 		handleResult(printer, result, &summary)
+		printer.AdvanceRepoProgress()
 	}
+
+	printer.FinishRepoProgress()
 
 	// Report collisions
 	for _, entry := range scanResult.Collisions {

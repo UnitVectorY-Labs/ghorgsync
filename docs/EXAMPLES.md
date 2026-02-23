@@ -57,6 +57,8 @@ This configuration excludes:
 
 ## Example Output
 
+The examples below show the stable log lines and summary output. In an interactive terminal (TTY), `ghorgsync` also renders a live progress bar during repository processing; that transient line is omitted here for readability.
+
 ### Clean Run
 
 When all repositories are already up to date and on their default branches, `ghorgsync` produces minimal output:

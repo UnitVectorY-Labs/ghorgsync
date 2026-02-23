@@ -93,6 +93,8 @@ When invoked, `ghorgsync` performs the following steps:
 8. **Report findings** (collisions, unknown folders, excluded-but-present).
 9. **Print a summary line** with counts.
 
+During the repository clone/process phase, `ghorgsync` shows a live progress bar on TTY output to indicate completion across managed repositories.
+
 ### Per-Repository Processing
 
 For each included repository that exists locally:
@@ -141,6 +143,8 @@ By default, `ghorgsync` only prints:
 
 Repositories that are already up to date with no notable events produce no output.
 
+When stdout is a TTY, a live progress bar is shown during repository processing. If an action or finding needs to be logged, the progress line is temporarily cleared, the log message is printed, and the progress bar is redrawn beneath it so the progress indicator remains at the bottom of the active output.
+
 ### Verbose Mode
 
 Use `--verbose` to see additional per-repository processing detail, such as the total number of repositories found and filtered.
@@ -148,6 +152,8 @@ Use `--verbose` to see additional per-repository processing detail, such as the 
 ### Color Control
 
 Output uses ANSI color codes to signal status categories when stdout is a TTY. Color improves readability but text labels are always present so output remains legible without color.
+
+The live progress bar uses the same color settings and is only rendered as an updating line when stdout is a TTY. Non-TTY output remains line-oriented for scripting/log capture.
 
 Color can be disabled by:
 
