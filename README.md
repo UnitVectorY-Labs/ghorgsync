@@ -24,13 +24,13 @@ Working with many repositories across a GitHub organization means constantly clo
    go install github.com/UnitVectorY-Labs/ghorgsync@latest
    ```
 
-2. **Configure** — create a `.ghorgsync` file in the directory where your repos live:
+2. **Configure:** create a `.ghorgsync` file in the directory where your repos live:
 
    ```yaml
    organization: my-org
    ```
 
-3. **Authenticate** — set a GitHub token:
+3. **Authenticate:** set a GitHub token (or login with `gh auth login`):
 
    ```bash
    export GITHUB_TOKEN=ghp_...
