@@ -1,3 +1,6 @@
+[![GitHub release](https://img.shields.io/github/release/UnitVectorY-Labs/ghorgsync.svg)](https://github.com/UnitVectorY-Labs/ghorgsync/releases/latest) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT) [![Active](https://img.shields.io/badge/Status-Active-green)](https://guide.unitvectorylabs.com/bestpractices/status/#active)
+ [![Go Report Card](https://goreportcard.com/badge/github.com/UnitVectorY-Labs/ghorgsync)](https://goreportcard.com/report/github.com/UnitVectorY-Labs/ghorgsync)
+
 # ghorgsync
 
 Clone and update all organization repositories in one folder, with clean-state and branch audits plus warnings for stray content.
