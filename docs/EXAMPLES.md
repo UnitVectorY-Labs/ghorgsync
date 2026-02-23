@@ -57,11 +57,11 @@ This configuration excludes:
 
 ## Example Output
 
-The examples below show the stable log lines and summary output. In an interactive terminal (TTY), `ghorgsync` also renders a live progress bar during repository processing; that transient line is omitted here for readability.
+The examples below show the stable log lines and summary output. In an interactive terminal (TTY), **ghorgsync** also renders a live progress bar during repository processing; that transient line is omitted here for readability.
 
 ### Clean Run
 
-When all repositories are already up to date and on their default branches, `ghorgsync` produces minimal output:
+When all repositories are already up to date and on their default branches, **ghorgsync** produces minimal output:
 
 ```
 Summary:
@@ -115,7 +115,7 @@ The output shows:
 
 ### Branch Drift Detected and Corrected
 
-When a clean repository is not on its default branch, `ghorgsync` checks out the default branch and pulls:
+When a clean repository is not on its default branch, **ghorgsync** checks out the default branch and pulls:
 
 ```
   repo  docs-site  [branch-drift: checked out main, updated]
@@ -182,7 +182,7 @@ Summary:
 
 ### Missing Dotfile
 
-If you run `ghorgsync` in a directory without a `.ghorgsync` file:
+If you run **ghorgsync** in a directory without a `.ghorgsync` file:
 
 ```
 No .ghorgsync configuration file found in the current directory.

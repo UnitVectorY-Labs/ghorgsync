@@ -16,16 +16,16 @@ permalink: /install
 
 ## Prerequisites
 
-- **Go 1.26+** — required if installing via `go install` or building from source
-- **git** — must be installed and available on your `PATH`; `ghorgsync` executes git commands to clone, fetch, and pull repositories
-- **GitHub authentication** — one of the following:
+- **Latest version of Go:** required if installing via `go install` or building from source
+- **git:** must be installed and available on your `PATH`; **ghorgsync** executes git commands to clone, fetch, and pull repositories
+- **GitHub authentication:** one of the following:
   - `GITHUB_TOKEN` environment variable (highest priority)
   - `GH_TOKEN` environment variable
   - [GitHub CLI](https://cli.github.com/) (`gh`) authenticated session (used as fallback)
 
 ## Installation Methods
 
-There are several ways to install `ghorgsync`:
+There are several ways to install **ghorgsync**:
 
 ### Download Binary
 

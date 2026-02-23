@@ -4,7 +4,7 @@ Clone and update all organization repositories in one folder, with clean-state a
 
 ## Why ghorgsync?
 
-Working with many repositories across a GitHub organization means constantly cloning new repos, pulling updates, and keeping track of local state. `ghorgsync` automates this into a single command that keeps your local directory in sync with your organization's repositories—safely and non-destructively.
+Working with many repositories across a GitHub organization means constantly cloning new repos, pulling updates, and keeping track of local state. **ghorgsync** automates this into a single command that keeps your local directory in sync with your organization's repositories—safely and non-destructively.
 
 ## Key Features
 
