@@ -42,9 +42,3 @@ Working with many repositories across a GitHub organization means constantly clo
    cd ~/repos
    ghorgsync
    ```
-
-## Documentation
-
-- [Installation](https://unitvectory-labs.github.io/ghorgsync/install) — binary downloads, `go install`, build from source
-- [Usage](https://unitvectory-labs.github.io/ghorgsync/usage) — configuration, authentication, CLI flags, runtime behavior
-- [Examples](https://unitvectory-labs.github.io/ghorgsync/examples) — sample configs and example output
