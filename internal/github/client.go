@@ -54,6 +54,7 @@ type ghRepo struct {
 	CloneURL      string `json:"clone_url"`
 	DefaultBranch string `json:"default_branch"`
 	Private       bool   `json:"private"`
+	Archived      bool   `json:"archived"`
 }
 
 // ListOrgRepos lists all repositories for the given organisation.
@@ -98,6 +99,7 @@ func (c *Client) ListOrgRepos(org string) ([]model.RepoInfo, error) {
 				CloneURL:      r.CloneURL,
 				DefaultBranch: r.DefaultBranch,
 				IsPrivate:     r.Private,
+				IsArchived:    r.Archived,
 			})
 		}
 

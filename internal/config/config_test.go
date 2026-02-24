@@ -146,3 +146,48 @@ func TestIsExcludedNonMatching(t *testing.T) {
 		t.Error("IsExcluded(my-sandbox) = true, want false (prefix pattern should not match suffix)")
 	}
 }
+
+func TestShouldIncludeArchivedDefault(t *testing.T) {
+cfg := &Config{Organization: "my-org"}
+if cfg.ShouldIncludeArchived() {
+t.Error("ShouldIncludeArchived() = true, want false (default)")
+}
+}
+
+func TestShouldIncludeArchivedExplicitTrue(t *testing.T) {
+cfg := &Config{
+Organization:    "my-org",
+IncludeArchived: boolPtr(true),
+}
+if !cfg.ShouldIncludeArchived() {
+t.Error("ShouldIncludeArchived() = false, want true when explicitly set")
+}
+}
+
+func TestShouldIncludeArchivedExplicitFalse(t *testing.T) {
+cfg := &Config{
+Organization:    "my-org",
+IncludeArchived: boolPtr(false),
+}
+if cfg.ShouldIncludeArchived() {
+t.Error("ShouldIncludeArchived() = true, want false when explicitly set to false")
+}
+}
+
+func TestLoadConfigWithIncludeArchived(t *testing.T) {
+yaml := `
+organization: my-org
+include_archived: true
+`
+path := writeTestConfig(t, yaml)
+cfg, err := Load(path)
+if err != nil {
+t.Fatalf("unexpected error: %v", err)
+}
+if cfg.IncludeArchived == nil || !*cfg.IncludeArchived {
+t.Errorf("IncludeArchived = %v, want true", cfg.IncludeArchived)
+}
+if !cfg.ShouldIncludeArchived() {
+t.Error("ShouldIncludeArchived() = false, want true")
+}
+}

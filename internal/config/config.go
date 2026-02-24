@@ -10,10 +10,11 @@ import (
 
 // Config represents the application configuration loaded from a YAML file.
 type Config struct {
-	Organization   string   `yaml:"organization"`
-	IncludePublic  *bool    `yaml:"include_public"`
-	IncludePrivate *bool    `yaml:"include_private"`
-	ExcludeRepos   []string `yaml:"exclude_repos"`
+	Organization    string   `yaml:"organization"`
+	IncludePublic   *bool    `yaml:"include_public"`
+	IncludePrivate  *bool    `yaml:"include_private"`
+	IncludeArchived *bool    `yaml:"include_archived"`
+	ExcludeRepos    []string `yaml:"exclude_repos"`
 
 	// compiledExcludes caches compiled regex patterns for ExcludeRepos.
 	compiledExcludes []*regexp.Regexp
@@ -66,6 +67,12 @@ func (c *Config) ShouldIncludePublic() bool {
 // Defaults to true when not explicitly set.
 func (c *Config) ShouldIncludePrivate() bool {
 	return c.IncludePrivate == nil || *c.IncludePrivate
+}
+
+// ShouldIncludeArchived returns true if archived repositories should be included.
+// Defaults to false when not explicitly set.
+func (c *Config) ShouldIncludeArchived() bool {
+	return c.IncludeArchived != nil && *c.IncludeArchived
 }
 
 // IsExcluded checks whether the given repository name matches any pattern in ExcludeRepos.

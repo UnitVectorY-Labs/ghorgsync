@@ -55,6 +55,17 @@ This configuration excludes:
 - Any repo ending with `-archive` (e.g., `old-service-archive`)
 - Any repo matching `test-*-tmp` (e.g., `test-api-tmp`)
 
+### Including Archived Repositories
+
+By default, archived repositories are ignored. To include them:
+
+```yaml
+organization: my-org
+include_archived: true
+```
+
+With this setting, archived repositories are cloned and synced like any other repository. Without it (the default), archived repositories are skipped and any existing local directories for them are reported as `excluded-but-present`.
+
 ## Example Output
 
 The examples below show the stable log lines and summary output. In an interactive terminal (TTY), **ghorgsync** also renders a live progress bar during repository processing; that transient line is omitted here for readability.

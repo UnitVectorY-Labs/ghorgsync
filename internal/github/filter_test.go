@@ -18,6 +18,15 @@ func sampleRepos() []model.RepoInfo {
 	}
 }
 
+func sampleReposWithArchived() []model.RepoInfo {
+	return []model.RepoInfo{
+		{Name: "public-repo", CloneURL: "https://github.com/org/public-repo.git", DefaultBranch: "main", IsPrivate: false},
+		{Name: "private-repo", CloneURL: "https://github.com/org/private-repo.git", DefaultBranch: "main", IsPrivate: true},
+		{Name: "archived-public", CloneURL: "https://github.com/org/archived-public.git", DefaultBranch: "main", IsPrivate: false, IsArchived: true},
+		{Name: "archived-private", CloneURL: "https://github.com/org/archived-private.git", DefaultBranch: "main", IsPrivate: true, IsArchived: true},
+	}
+}
+
 func TestFilterRepos_DefaultConfig(t *testing.T) {
 	cfg := &config.Config{Organization: "org"}
 	included, excluded := FilterRepos(sampleRepos(), cfg)
@@ -109,4 +118,40 @@ func TestFilterRepos_ExcludedListTracked(t *testing.T) {
 			t.Errorf("unexpected excluded repo: %q", name)
 		}
 	}
+}
+
+func TestFilterRepos_ArchivedExcludedByDefault(t *testing.T) {
+cfg := &config.Config{Organization: "org"}
+included, excluded := FilterRepos(sampleReposWithArchived(), cfg)
+if len(included) != 2 {
+t.Errorf("expected 2 included repos (non-archived), got %d", len(included))
+}
+if len(excluded) != 2 {
+t.Errorf("expected 2 excluded repos (archived), got %d", len(excluded))
+}
+for _, r := range included {
+if r.IsArchived {
+t.Errorf("archived repo %q should have been filtered out", r.Name)
+}
+}
+expectedExcluded := map[string]bool{"archived-public": true, "archived-private": true}
+for _, name := range excluded {
+if !expectedExcluded[name] {
+t.Errorf("unexpected excluded repo: %q", name)
+}
+}
+}
+
+func TestFilterRepos_ArchivedIncludedWhenConfigured(t *testing.T) {
+cfg := &config.Config{
+Organization:    "org",
+IncludeArchived: boolPtr(true),
+}
+included, excluded := FilterRepos(sampleReposWithArchived(), cfg)
+if len(included) != 4 {
+t.Errorf("expected 4 included repos (including archived), got %d", len(included))
+}
+if len(excluded) != 0 {
+t.Errorf("expected 0 excluded repos, got %d", len(excluded))
+}
 }

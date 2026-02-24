@@ -5,7 +5,7 @@ import (
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/model"
 )
 
-// FilterRepos applies visibility and exclusion filters to the repo list.
+// FilterRepos applies visibility, archived, and exclusion filters to the repo list.
 func FilterRepos(repos []model.RepoInfo, cfg *config.Config) (included []model.RepoInfo, excluded []string) {
 	for _, r := range repos {
 		// Visibility filter
@@ -13,6 +13,11 @@ func FilterRepos(repos []model.RepoInfo, cfg *config.Config) (included []model.R
 			continue
 		}
 		if !r.IsPrivate && !cfg.ShouldIncludePublic() {
+			continue
+		}
+		// Archived filter: skip archived repos unless explicitly included
+		if r.IsArchived && !cfg.ShouldIncludeArchived() {
+			excluded = append(excluded, r.Name)
 			continue
 		}
 		// Exclusion filter
