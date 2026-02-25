@@ -6,6 +6,7 @@ type RepoInfo struct {
 	CloneURL      string
 	DefaultBranch string
 	IsPrivate     bool
+	IsArchived    bool
 }
 
 // LocalClassification represents the classification of a local directory entry.

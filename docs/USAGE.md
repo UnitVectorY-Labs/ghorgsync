@@ -27,6 +27,7 @@ permalink: /usage
 | `organization` | string | *(required)* | GitHub organization name to sync |
 | `include_public` | boolean | `true` | Include public repositories |
 | `include_private` | boolean | `true` | Include private repositories |
+| `include_archived` | boolean | `false` | Include archived repositories |
 | `exclude_repos` | array | `[]` | Repository names or regex patterns to exclude |
 
 ### Exclude Patterns
@@ -79,7 +80,7 @@ When invoked, **ghorgsync** performs the following steps:
 1. **Load configuration** from `.ghorgsync` and validate it.
 2. **Resolve authentication** and connect to the GitHub API. See [Installation](INSTALL.md#prerequisites) for configuring authentication.
 3. **Fetch the organization repository list** including default branch metadata.
-4. **Filter repositories** by visibility (`include_public`/`include_private`) and exclusion patterns.
+4. **Filter repositories** by visibility (`include_public`/`include_private`), archived status (`include_archived`), and exclusion patterns.
 5. **Scan the local directory** and classify child entries (see [Local Directory Classification](#local-directory-classification)).
 6. **Clone missing repositories**.
 7. **Process existing repositories** (fetch, audit, conditionally checkout and pull).
@@ -193,6 +194,13 @@ Audit findings are user-facing warnings, not command failures.
 
 {: .highlight }
 Hidden entries (starting with `.`) are skipped during scanning. The exception being repositories with names that start with a dot, which are valid and processed normally.
+
+## Archived Repositories
+
+GitHub repositories can be archived, making them read-only. **ghorgsync** treats archived repositories based on the `include_archived` configuration setting:
+
+- **Default (`include_archived: false`):** Archived repositories are ignored entirely. They are not cloned and are not synced. If a local directory exists for an archived repository, it is classified as **excluded-but-present** and reported accordingly.
+- **Opt-in (`include_archived: true`):** Archived repositories are treated like any other repository — cloned if missing, and synced (fetch/audit) if present.
 
 ## Branch Drift
 
