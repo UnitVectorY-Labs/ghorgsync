@@ -41,16 +41,6 @@ func main() {
 		os.Exit(0)
 	}
 
-	// Validate mutually exclusive mode flags
-	modeCount := 0
-	if *cloneOnlyFlag {
-		modeCount++
-	}
-	if modeCount > 1 {
-		fmt.Fprintln(os.Stderr, "error: --clone cannot be combined with other mode flags")
-		os.Exit(1)
-	}
-
 	useColor := !*noColorFlag && output.ShouldColor()
 	printer := output.NewPrinter(useColor, *verboseFlag)
 
