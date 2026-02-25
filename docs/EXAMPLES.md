@@ -178,6 +178,30 @@ Summary:
   total: 8 | cloned: 1 | updated: 1 | dirty: 1 | branch-drift: 1 | unknown: 1 | excluded-but-present: 1 | errors: 0
 ```
 
+### Clone-Only Mode
+
+Using `--clone` to quickly clone only missing repositories without processing existing ones:
+
+```
+$ ghorgsync --clone
+  repo  new-service  [cloned]
+  repo  new-library  [cloned]
+
+Summary:
+  total: 10 | cloned: 2 | updated: 0 | dirty: 0 | branch-drift: 0 | unknown: 0 | excluded-but-present: 0 | errors: 0
+```
+
+When all repositories are already cloned locally, `--clone` finishes quickly with no output:
+
+```
+$ ghorgsync --clone
+
+Summary:
+  total: 10 | cloned: 0 | updated: 0 | dirty: 0 | branch-drift: 0 | unknown: 0 | excluded-but-present: 0 | errors: 0
+```
+
+This mode skips all per-repository processing (fetch, dirty check, checkout, pull) and directory auditing (collisions, unknown folders, excluded-but-present), making it significantly faster when you only need to pull down new repositories.
+
 ## Troubleshooting
 
 ### Missing Dotfile

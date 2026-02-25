@@ -60,6 +60,11 @@ ghorgsync [flags]
 | `--version` | Print version and exit |
 | `--verbose` | Enable verbose output (show per-repository processing detail) |
 | `--no-color` | Disable color output |
+| `--clone` | Clone-only mode: only clone missing repositories (see [Clone-Only Mode](#clone-only-mode)) |
+
+### Mode Flags
+
+The `--clone` flag is a mode flag that changes the sync behavior. Mode flags are mutually exclusive; if multiple mode flags are provided, the command exits with an error.
 
 ## Runtime Behavior
 
@@ -82,6 +87,24 @@ When invoked, **ghorgsync** performs the following steps:
 9. **Print a summary line** with counts.
 
 During the repository clone/process phase, **ghorgsync** shows a live progress bar on TTY output to indicate completion across managed repositories.
+
+### Clone-Only Mode
+
+When invoked with `--clone`, **ghorgsync** runs a streamlined workflow focused exclusively on cloning missing repositories:
+
+1. **Load configuration** and **resolve authentication** (same as default mode).
+2. **Fetch the organization repository list** and **filter repositories** (same as default mode).
+3. **Scan the local directory** to identify which included repositories are missing.
+4. **Clone missing repositories** only.
+5. **Print a summary line** with counts.
+
+**What is skipped** compared to the default workflow:
+
+- Processing existing repositories (fetch, dirty check, checkout, pull) is entirely skipped.
+- Collisions, unknown folders, and excluded-but-present findings are not reported.
+- The progress bar only covers missing repositories to clone.
+
+This mode is useful when you know a new repository has been added to the organization and you want to quickly pull it down without waiting for every existing repository to be fetched and checked.
 
 ### Per-Repository Processing
 

@@ -33,6 +33,7 @@ func main() {
 	versionFlag := flag.Bool("version", false, "Print version and exit")
 	verboseFlag := flag.Bool("verbose", false, "Enable verbose output")
 	noColorFlag := flag.Bool("no-color", false, "Disable color output")
+	cloneOnlyFlag := flag.Bool("clone", false, "Only clone missing repositories (skip processing existing repos)")
 	flag.Parse()
 
 	if *versionFlag {
@@ -106,44 +107,60 @@ func main() {
 	// Summary counters
 	var summary model.Summary
 	summary.TotalRepos = len(included)
-	summary.UnknownFolders = len(scanResult.Unknown)
-	summary.ExcludedButPresent = len(scanResult.ExcludedButPresent)
-	summary.Errors = len(scanResult.Collisions)
 
-	repoWorkTotal := len(scanResult.ManagedMissing) + len(scanResult.ManagedFound)
-	printer.StartRepoProgress(repoWorkTotal)
+	if *cloneOnlyFlag {
+		// Clone-only mode: only clone missing repos, skip everything else
+		printer.StartRepoProgress(len(scanResult.ManagedMissing))
 
-	// Clone missing repos
-	for _, name := range scanResult.ManagedMissing {
-		repo := repoMap[name]
-		result := eng.CloneRepo(repo)
-		handleResult(printer, result, &summary)
-		printer.AdvanceRepoProgress()
-	}
+		for _, name := range scanResult.ManagedMissing {
+			repo := repoMap[name]
+			result := eng.CloneRepo(repo)
+			handleResult(printer, result, &summary)
+			printer.AdvanceRepoProgress()
+		}
 
-	// Process existing repos
-	for _, name := range scanResult.ManagedFound {
-		repo := repoMap[name]
-		result := eng.ProcessRepo(repo)
-		handleResult(printer, result, &summary)
-		printer.AdvanceRepoProgress()
-	}
+		printer.FinishRepoProgress()
+	} else {
+		// Default mode: full sync
+		summary.UnknownFolders = len(scanResult.Unknown)
+		summary.ExcludedButPresent = len(scanResult.ExcludedButPresent)
+		summary.Errors = len(scanResult.Collisions)
 
-	printer.FinishRepoProgress()
+		repoWorkTotal := len(scanResult.ManagedMissing) + len(scanResult.ManagedFound)
+		printer.StartRepoProgress(repoWorkTotal)
 
-	// Report collisions
-	for _, entry := range scanResult.Collisions {
-		printer.Collision(entry.Name, entry.Detail)
-	}
+		// Clone missing repos
+		for _, name := range scanResult.ManagedMissing {
+			repo := repoMap[name]
+			result := eng.CloneRepo(repo)
+			handleResult(printer, result, &summary)
+			printer.AdvanceRepoProgress()
+		}
 
-	// Report unknown folders
-	for _, entry := range scanResult.Unknown {
-		printer.UnknownFolder(entry.Name)
-	}
+		// Process existing repos
+		for _, name := range scanResult.ManagedFound {
+			repo := repoMap[name]
+			result := eng.ProcessRepo(repo)
+			handleResult(printer, result, &summary)
+			printer.AdvanceRepoProgress()
+		}
 
-	// Report excluded-but-present
-	for _, entry := range scanResult.ExcludedButPresent {
-		printer.ExcludedButPresent(entry.Name)
+		printer.FinishRepoProgress()
+
+		// Report collisions
+		for _, entry := range scanResult.Collisions {
+			printer.Collision(entry.Name, entry.Detail)
+		}
+
+		// Report unknown folders
+		for _, entry := range scanResult.Unknown {
+			printer.UnknownFolder(entry.Name)
+		}
+
+		// Report excluded-but-present
+		for _, entry := range scanResult.ExcludedButPresent {
+			printer.ExcludedButPresent(entry.Name)
+		}
 	}
 
 	// Print summary
