@@ -68,7 +68,13 @@ With this setting, archived repositories are cloned and synced like any other re
 
 ## Example Output
 
-The examples below show the stable log lines and summary output. In an interactive terminal (TTY), **ghorgsync** also renders a live progress bar during repository processing; that transient line is omitted here for readability.
+The examples below show the stable log lines and summary output. In an interactive terminal (TTY), **ghorgsync** also renders a live progress bar during repository processing. The progress bar uses smooth Unicode block characters and scales to the terminal width:
+
+```
+  repo   3/10 [█████████████████▋                                         ]  30%
+```
+
+The transient progress line is omitted from the remaining examples below for readability.
 
 ### Clean Run
 

@@ -87,7 +87,11 @@ When invoked, **ghorgsync** performs the following steps:
 8. **Report findings** (collisions, unknown folders, excluded-but-present).
 9. **Print a summary line** with counts.
 
-During the repository clone/process phase, **ghorgsync** shows a live progress bar on TTY output to indicate completion across managed repositories.
+During the repository clone/process phase, **ghorgsync** shows a live progress bar on TTY output to indicate completion across managed repositories. The progress bar scales to the full terminal width and uses smooth Unicode block characters (▏▎▍▌▋▊▉█) for high-resolution progress feedback. The layout shows the `repo` label and a padded counter on the left, a proportional bar in the center, and a color-coded percentage on the right:
+
+```
+  repo   3/10 [█████████████████▋                                         ]  30%
+```
 
 ### Clone-Only Mode
 
@@ -155,7 +159,7 @@ By default, **ghorgsync** only prints:
 
 Repositories that are already up to date with no notable events produce no output.
 
-When stdout is a TTY, a live progress bar is shown during repository processing. If an action or finding needs to be logged, the progress line is temporarily cleared, the log message is printed, and the progress bar is redrawn beneath it so the progress indicator remains at the bottom of the active output.
+When stdout is a TTY, a live progress bar is shown during repository processing. The progress bar uses the `repo` label with a padded counter, a smooth Unicode block bar that spans the terminal width, and a percentage indicator. If an action or finding needs to be logged, the progress line is temporarily cleared, the log message is printed, and the progress bar is redrawn beneath it so the progress indicator remains at the bottom of the active output.
 
 ### Verbose Mode
 
@@ -165,7 +169,7 @@ Use `--verbose` to see additional per-repository processing detail, such as the 
 
 Output uses ANSI color codes to signal status categories when stdout is a TTY. Color improves readability but text labels are always present so output remains legible without color.
 
-The live progress bar uses the same color settings and is only rendered as an updating line when stdout is a TTY. Non-TTY output remains line-oriented for scripting/log capture.
+The live progress bar uses the same color settings and is only rendered as an updating line when stdout is a TTY. It adapts to the terminal width, using smooth Unicode block characters for fractional progress. Non-TTY output remains line-oriented for scripting/log capture.
 
 Color can be disabled by:
 

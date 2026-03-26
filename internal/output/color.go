@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"golang.org/x/term"
 )
 
 // ANSI color codes
@@ -21,13 +23,45 @@ const (
 	clearLine = "\r\033[2K"
 )
 
-const repoProgressBarWidth = 28
+// Unicode block characters for smooth progress bar rendering (1/8 to 7/8 fill).
+var partialBlocks = [8]string{" ", "▏", "▎", "▍", "▌", "▋", "▊", "▉"}
+
+const fullBlock = "█"
+
+// defaultTerminalWidth is used when the actual terminal width cannot be determined.
+const defaultTerminalWidth = 80
+
+// minBarWidth is the minimum number of character cells for the progress bar content.
+const minBarWidth = 10
 
 type repoProgressState struct {
-	active  bool
-	live    bool
-	total   int
-	current int
+	active     bool
+	live       bool
+	total      int
+	current    int
+	totalWidth int // number of digits in total, for padding current
+}
+
+// getTerminalWidth returns the current terminal column count, or the default.
+func getTerminalWidth() int {
+	width, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err != nil || width <= 0 {
+		return defaultTerminalWidth
+	}
+	return width
+}
+
+// digitCount returns the number of decimal digits in n (minimum 1).
+func digitCount(n int) int {
+	if n <= 0 {
+		return 1
+	}
+	count := 0
+	for n > 0 {
+		count++
+		n /= 10
+	}
+	return count
 }
 
 // Printer handles formatted output with optional color support.
@@ -99,6 +133,12 @@ func (p *Printer) drawRepoProgressLine() {
 }
 
 func (p *Printer) repoProgressLine() string {
+	return p.renderProgressLine(getTerminalWidth())
+}
+
+// renderProgressLine builds the progress line for a given terminal width.
+// Layout:  repo  XX/YY [████████▋          ]  67%
+func (p *Printer) renderProgressLine(termWidth int) string {
 	total := p.repoProgress.total
 	current := p.repoProgress.current
 
@@ -113,43 +153,69 @@ func (p *Printer) repoProgressLine() string {
 	}
 
 	percent := (current * 100) / total
-	filled := (current * repoProgressBarWidth) / total
-	if current == total {
-		filled = repoProgressBarWidth
+
+	// Build the counter string: current is right-padded with spaces to match total width.
+	tw := p.repoProgress.totalWidth
+	if tw < 1 {
+		tw = digitCount(total)
 	}
-	if filled > repoProgressBarWidth {
-		filled = repoProgressBarWidth
+	counterStr := fmt.Sprintf("%*d/%d", tw, current, total)
+
+	// Fixed-width elements:
+	//   "  " (2)  +  "repo" (4)  +  "  " (2)  +  counter  +  " " (1)
+	//   +  "[" (1)  +  bar  +  "]" (1)  +  " " (1)  +  pct (4)
+	counterWidth := tw + 1 + digitCount(total)
+	fixedWidth := 2 + 4 + 2 + counterWidth + 1 + 1 + 1 + 1 + 4
+
+	barWidth := termWidth - fixedWidth
+	if barWidth < minBarWidth {
+		barWidth = minBarWidth
 	}
 
-	remaining := repoProgressBarWidth - filled
-	head := ""
-	if current > 0 && current < total && remaining > 0 {
-		head = ">"
-		remaining--
+	// Compute filled portion using eighths for smooth partial steps.
+	filledEighths := 0
+	if total > 0 {
+		filledEighths = (current * barWidth * 8) / total
+	}
+	fullBlocks := filledEighths / 8
+	partialEighths := filledEighths % 8
+	emptyBlocks := barWidth - fullBlocks
+	if partialEighths > 0 {
+		emptyBlocks--
+	}
+	// Safety clamp
+	if emptyBlocks < 0 {
+		emptyBlocks = 0
 	}
 
-	var b strings.Builder
-	b.WriteString("  ")
-	b.WriteString(p.colorize(cyan, "progress"))
-	b.WriteString(" ")
-	b.WriteString(p.colorize(gray, "["))
-	b.WriteString(p.colorize(green, strings.Repeat("=", filled)))
-	if head != "" {
-		b.WriteString(p.colorize(cyan, head))
+	// Build progress bar content.
+	var bar strings.Builder
+	bar.WriteString(strings.Repeat(fullBlock, fullBlocks))
+	if partialEighths > 0 {
+		bar.WriteString(partialBlocks[partialEighths])
 	}
-	b.WriteString(p.colorize(gray, strings.Repeat("-", remaining)))
-	b.WriteString(p.colorize(gray, "]"))
-	b.WriteString(" ")
+	bar.WriteString(strings.Repeat(" ", emptyBlocks))
 
+	// Percentage color: green at 100%, yellow at 60%+, cyan otherwise.
 	percentColor := cyan
 	if percent >= 100 {
 		percentColor = green
 	} else if percent >= 60 {
 		percentColor = yellow
 	}
-	b.WriteString(p.colorize(percentColor, fmt.Sprintf("%3d%%", percent)))
+
+	// Assemble the line.
+	var b strings.Builder
+	b.WriteString("  ")
+	b.WriteString(p.colorize(cyan, "repo"))
+	b.WriteString("  ")
+	b.WriteString(p.colorize(gray, counterStr))
 	b.WriteString(" ")
-	b.WriteString(p.colorize(gray, fmt.Sprintf("%d/%d repos", current, total)))
+	b.WriteString(p.colorize(gray, "["))
+	b.WriteString(p.colorize(green, bar.String()))
+	b.WriteString(p.colorize(gray, "]"))
+	b.WriteString(" ")
+	b.WriteString(p.colorize(percentColor, fmt.Sprintf("%3d%%", percent)))
 
 	return b.String()
 }
@@ -161,10 +227,11 @@ func (p *Printer) StartRepoProgress(total int) {
 		return
 	}
 	p.repoProgress = repoProgressState{
-		active:  true,
-		live:    p.interactive,
-		total:   total,
-		current: 0,
+		active:     true,
+		live:       p.interactive,
+		total:      total,
+		current:    0,
+		totalWidth: digitCount(total),
 	}
 	if p.repoProgress.live {
 		p.drawRepoProgressLine()
