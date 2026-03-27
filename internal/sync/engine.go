@@ -166,7 +166,8 @@ func (e *Engine) StatusRepo(repo model.RepoInfo) model.RepoResult {
 	if dirty {
 		result.Action = model.ActionDirty
 		result.DirtyFiles = files
-		// Get colorized status output
+		// Get colorized status output for display; non-fatal if unavailable
+		// since the dirty state is already captured in DirtyFiles.
 		statusOut, _ := e.Git.StatusShort(repoDir)
 		result.StatusOutput = statusOut
 		return result

@@ -234,6 +234,8 @@ Summary:
   total: 10 | dirty: 1 | branch-drift: 1
 ```
 
+The file status lines show the output of `git status --short` with its native color coding. The two-character prefix (`M`, `??`, `A`, etc.) follows git's standard format where the first column indicates staged changes and the second column indicates unstaged changes.
+
 When all repositories are clean and on their default branches, `--status` produces minimal output:
 
 ```
