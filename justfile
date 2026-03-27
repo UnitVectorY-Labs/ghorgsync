@@ -1,13 +1,12 @@
 
-# List all available commands
+# Commands for ghorgsync
 default:
   @just --list
-
-# Build the Go application
+# Build ghorgsync with Go
 build:
   go build ./...
 
-# Run the Go tests
+# Run tests for ghorgsync with Go
 test:
   go clean -testcache
   go test ./...

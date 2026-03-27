@@ -1,0 +1,12 @@
+name: ghorgsync
+default_branch: main
+config:
+  description: "Clone and update all organization repositories in one folder, with clean-state and branch audits plus warnings for stray content."
+  license: MIT
+  language: go
+  release: release-go
+  justfile: true
+  codecov: false
+  docs:
+    enabled: true
+    domain: ghorgsync.unitvectorylabs.com
