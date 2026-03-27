@@ -34,7 +34,14 @@ func main() {
 	verboseFlag := flag.Bool("verbose", false, "Enable verbose output")
 	noColorFlag := flag.Bool("no-color", false, "Disable color output")
 	cloneOnlyFlag := flag.Bool("clone", false, "Only clone missing repositories (skip processing existing repos)")
+	statusFlag := flag.Bool("status", false, "Show status of repositories (dirty repos and branch drift only)")
 	flag.Parse()
+
+	// Mode flags are mutually exclusive
+	if *cloneOnlyFlag && *statusFlag {
+		fmt.Fprintln(os.Stderr, "error: --clone and --status are mutually exclusive")
+		os.Exit(1)
+	}
 
 	if *versionFlag {
 		fmt.Printf("ghorgsync version %s\n", Version)
@@ -120,6 +127,31 @@ func main() {
 		}
 
 		printer.FinishRepoProgress()
+	} else if *statusFlag {
+		// Status mode: read-only check of existing repos
+		printer.StartRepoProgress(len(scanResult.ManagedFound))
+
+		for _, name := range scanResult.ManagedFound {
+			repo := repoMap[name]
+			result := eng.StatusRepo(repo)
+			switch result.Action {
+			case model.ActionDirty:
+				printer.RepoStatusDirty(result.Name, result.CurrentBranch, result.DefaultBranch, result.StatusOutput)
+				summary.Dirty++
+			case model.ActionBranchDrift:
+				printer.RepoStatusBranchDrift(result.Name, result.CurrentBranch, result.DefaultBranch)
+				summary.BranchDrift++
+			case model.ActionFetchError:
+				printer.RepoError(result.Name, result.Action.String(), result.Error)
+				summary.Errors++
+			}
+			printer.AdvanceRepoProgress()
+		}
+
+		printer.FinishRepoProgress()
+
+		printer.StatusSummary(summary.TotalRepos, summary.Dirty, summary.BranchDrift)
+		os.Exit(0)
 	} else {
 		// Default mode: full sync
 		summary.UnknownFolders = len(scanResult.Unknown)

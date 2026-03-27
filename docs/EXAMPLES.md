@@ -219,6 +219,44 @@ Summary:
 
 This mode skips all per-repository processing (fetch, dirty check, checkout, pull) and directory auditing (collisions, unknown folders, excluded-but-present), making it significantly faster when you only need to pull down new repositories.
 
+### Status Mode
+
+Using `--status` to check which repositories are dirty or not on their default branch:
+
+```
+$ ghorgsync --status
+  repo  web-frontend  [dirty] on feature-branch (default: main)
+        M src/index.ts
+       ?? new-file.txt
+  repo  docs-site  [branch-drift] on feature-docs (default: main)
+
+Summary:
+  total: 10 | dirty: 1 | branch-drift: 1
+```
+
+When all repositories are clean and on their default branches, `--status` produces minimal output:
+
+```
+$ ghorgsync --status
+
+Summary:
+  total: 10 | dirty: 0 | branch-drift: 0
+```
+
+A dirty repository on a non-default branch is reported as dirty (not branch-drift):
+
+```
+$ ghorgsync --status
+  repo  web-frontend  [dirty] on feature-branch (default: main)
+        M src/index.ts
+       A  staged-file.ts
+
+Summary:
+  total: 10 | dirty: 1 | branch-drift: 0
+```
+
+This mode performs no git operations that modify repositories — no fetch, checkout, or pull. It is purely read-only and safe to run at any time.
+
 ## Troubleshooting
 
 ### Missing Dotfile
