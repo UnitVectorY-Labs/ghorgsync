@@ -62,10 +62,11 @@ ghorgsync [flags]
 | `--verbose` | Enable verbose output (show per-repository processing detail) |
 | `--no-color` | Disable color output |
 | `--clone` | Clone-only mode: only clone missing repositories (see [Clone-Only Mode](#clone-only-mode)) |
+| `--status` | Status mode: show only dirty repos and branch drift (see [Status Mode](#status-mode)) |
 
 ### Mode Flags
 
-The `--clone` flag is a mode flag that changes the sync behavior. Mode flags are mutually exclusive; if multiple mode flags are provided, the command exits with an error.
+The `--clone` and `--status` flags are mode flags that change the sync behavior. Mode flags are mutually exclusive; if multiple mode flags are provided, the command exits with an error.
 
 ## Runtime Behavior
 
@@ -110,6 +111,28 @@ When invoked with `--clone`, **ghorgsync** runs a streamlined workflow focused e
 - The progress bar only covers missing repositories to clone.
 
 This mode is useful when you know a new repository has been added to the organization and you want to quickly pull it down without waiting for every existing repository to be fetched and checked.
+
+### Status Mode
+
+When invoked with `--status`, **ghorgsync** runs a read-only workflow that reports which repositories are dirty or not on their default branch:
+
+1. **Load configuration** and **resolve authentication** (same as default mode).
+2. **Fetch the organization repository list** and **filter repositories** (same as default mode).
+3. **Scan the local directory** to identify which included repositories exist locally.
+4. **Check each existing repository** for dirty state and branch drift.
+5. **Print only repositories that are dirty or not on their default branch.**
+6. **Print a summary line** with counts.
+
+**What is skipped** compared to the default workflow:
+
+- No git operations that modify the repository (no fetch, no checkout, no pull).
+- Missing repositories are not cloned.
+- Collisions, unknown folders, and excluded-but-present findings are not reported.
+- Repositories that are clean and on their default branch produce no output.
+
+For dirty repositories, the colorized output from `git status --short` is displayed, showing staged and unstaged changes with git's native color coding. For repositories on a non-default branch (but otherwise clean), the current and default branches are shown.
+
+This mode is useful for quickly surveying which repositories need attention without modifying anything.
 
 ### Per-Repository Processing
 

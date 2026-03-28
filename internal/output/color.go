@@ -408,6 +408,64 @@ func (p *Printer) SystemError(context string, err error) {
 	})
 }
 
+// RepoStatusDirty prints a dirty repo in status mode with colorized git status output.
+func (p *Printer) RepoStatusDirty(name, currentBranch, defaultBranch, statusOutput string) {
+	branchInfo := currentBranch
+	if currentBranch != defaultBranch {
+		branchInfo = currentBranch + " (default: " + defaultBranch + ")"
+	}
+	p.withProgressSuspended(func() {
+		fmt.Printf("  %s %s %s on %s\n",
+			p.colorize(cyan, "repo"),
+			p.colorize(bold, name),
+			p.colorize(yellow, "[dirty]"),
+			branchInfo)
+		// Print colorized git status output (already includes ANSI codes from git)
+		for _, line := range strings.Split(strings.TrimRight(statusOutput, "\n"), "\n") {
+			if line != "" {
+				fmt.Printf("       %s\n", line)
+			}
+		}
+	})
+}
+
+// RepoStatusBranchDrift prints a non-default branch finding in status mode.
+func (p *Printer) RepoStatusBranchDrift(name, currentBranch, defaultBranch string) {
+	p.withProgressSuspended(func() {
+		fmt.Printf("  %s %s %s on %s (default: %s)\n",
+			p.colorize(cyan, "repo"),
+			p.colorize(bold, name),
+			p.colorize(yellow, "[branch-drift]"),
+			currentBranch,
+			defaultBranch)
+	})
+}
+
+// StatusSummary prints the summary line for status mode.
+func (p *Printer) StatusSummary(total, dirty, branchDrift int) {
+	p.withProgressSuspended(func() {
+		fmt.Println()
+		fmt.Println(p.colorize(bold, "Summary:"))
+
+		parts := []string{
+			fmt.Sprintf("total: %d", total),
+		}
+
+		if dirty > 0 {
+			parts = append(parts, p.colorize(yellow, fmt.Sprintf("dirty: %d", dirty)))
+		} else {
+			parts = append(parts, fmt.Sprintf("dirty: %d", dirty))
+		}
+		if branchDrift > 0 {
+			parts = append(parts, p.colorize(yellow, fmt.Sprintf("branch-drift: %d", branchDrift)))
+		} else {
+			parts = append(parts, fmt.Sprintf("branch-drift: %d", branchDrift))
+		}
+
+		fmt.Println("  " + strings.Join(parts, " | "))
+	})
+}
+
 // DirtyFileInfo is a simple struct for passing to Printer.
 type DirtyFileInfo struct {
 	Path     string

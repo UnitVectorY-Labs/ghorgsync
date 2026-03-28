@@ -20,6 +20,7 @@ type GitRunner interface {
 	Checkout(repoDir, branch string) error
 	PullFF(repoDir string) (bool, error) // returns true if changes were pulled
 	RemoteURL(repoDir string) (string, error)
+	StatusShort(repoDir string) (string, error) // returns colorized short status output
 }
 
 // ExecGitRunner runs real git commands.
@@ -155,4 +156,13 @@ func (g *ExecGitRunner) RemoteURL(repoDir string) (string, error) {
 		return "", fmt.Errorf("git remote get-url: %w", err)
 	}
 	return strings.TrimSpace(string(out)), nil
+}
+
+func (g *ExecGitRunner) StatusShort(repoDir string) (string, error) {
+	cmd := exec.Command("git", "-C", repoDir, "-c", "color.status=always", "status", "--short")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("git status: %w", err)
+	}
+	return string(out), nil
 }

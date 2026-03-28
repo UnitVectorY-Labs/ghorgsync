@@ -133,3 +133,51 @@ func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 
 	return result
 }
+
+// StatusRepo reads the current state of a repository without modifying it.
+// It returns ActionDirty if the working tree is dirty, ActionBranchDrift if
+// the repo is on a non-default branch (and clean), or ActionAlreadyCurrent
+// if the repo is clean and on the default branch.
+func (e *Engine) StatusRepo(repo model.RepoInfo) model.RepoResult {
+	repoDir := filepath.Join(e.BaseDir, repo.Name)
+	result := model.RepoResult{
+		Name:          repo.Name,
+		DefaultBranch: repo.DefaultBranch,
+	}
+
+	// Get current branch
+	branch, err := e.Git.CurrentBranch(repoDir)
+	if err != nil {
+		result.Action = model.ActionFetchError
+		result.Error = err
+		return result
+	}
+	result.CurrentBranch = branch
+	result.BranchDrift = branch != repo.DefaultBranch
+
+	// Check dirty state
+	dirty, files, err := e.Git.IsDirty(repoDir)
+	if err != nil {
+		result.Action = model.ActionFetchError
+		result.Error = err
+		return result
+	}
+
+	if dirty {
+		result.Action = model.ActionDirty
+		result.DirtyFiles = files
+		// Get colorized status output for display; non-fatal if unavailable
+		// since the dirty state is already captured in DirtyFiles.
+		statusOut, _ := e.Git.StatusShort(repoDir)
+		result.StatusOutput = statusOut
+		return result
+	}
+
+	if result.BranchDrift {
+		result.Action = model.ActionBranchDrift
+		return result
+	}
+
+	result.Action = model.ActionAlreadyCurrent
+	return result
+}
