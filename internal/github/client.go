@@ -57,10 +57,9 @@ type ghRepo struct {
 	Archived      bool   `json:"archived"`
 }
 
-// ListOrgRepos lists all repositories for the given organisation.
-func (c *Client) ListOrgRepos(org string) ([]model.RepoInfo, error) {
+// listRepos fetches all repositories from the given paginated GitHub API URL.
+func (c *Client) listRepos(url string) ([]model.RepoInfo, error) {
 	var repos []model.RepoInfo
-	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&page=1", org)
 
 	for url != "" {
 		req, err := http.NewRequest("GET", url, nil)
@@ -107,6 +106,18 @@ func (c *Client) ListOrgRepos(org string) ([]model.RepoInfo, error) {
 	}
 
 	return repos, nil
+}
+
+// ListOrgRepos lists all repositories for the given organisation.
+func (c *Client) ListOrgRepos(org string) ([]model.RepoInfo, error) {
+	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&page=1", org)
+	return c.listRepos(url)
+}
+
+// ListUserRepos lists all repositories for the given user account.
+func (c *Client) ListUserRepos(username string) ([]model.RepoInfo, error) {
+	url := fmt.Sprintf("https://api.github.com/users/%s/repos?per_page=100&page=1", username)
+	return c.listRepos(url)
 }
 
 // nextLink parses the GitHub Link header and returns the URL for rel="next", or "".

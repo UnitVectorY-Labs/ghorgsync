@@ -11,6 +11,7 @@ import (
 // Config represents the application configuration loaded from a YAML file.
 type Config struct {
 	Organization    string   `yaml:"organization"`
+	User            string   `yaml:"user"`
 	IncludePublic   *bool    `yaml:"include_public"`
 	IncludePrivate  *bool    `yaml:"include_private"`
 	IncludeArchived *bool    `yaml:"include_archived"`
@@ -37,8 +38,12 @@ func Load(path string) (*Config, error) {
 
 // Validate checks the configuration for logical errors.
 func (c *Config) Validate() error {
-	if c.Organization == "" {
-		return fmt.Errorf("organization is required")
+	if c.Organization != "" && c.User != "" {
+		return fmt.Errorf("organization and user are mutually exclusive; specify one but not both")
+	}
+
+	if c.Organization == "" && c.User == "" {
+		return fmt.Errorf("one of organization or user is required")
 	}
 
 	if c.IncludePublic != nil && !*c.IncludePublic &&
@@ -55,6 +60,21 @@ func (c *Config) Validate() error {
 	}
 
 	return nil
+}
+
+// Owner returns the configured organization or user name.
+// This should only be called after Validate() has confirmed that exactly one of
+// Organization or User is set.
+func (c *Config) Owner() string {
+	if c.Organization != "" {
+		return c.Organization
+	}
+	return c.User
+}
+
+// IsUserMode returns true if the configuration targets a user account rather than an organization.
+func (c *Config) IsUserMode() bool {
+	return c.User != ""
 }
 
 // ShouldIncludePublic returns true if public repositories should be included.

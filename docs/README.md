@@ -7,13 +7,14 @@ permalink: /
 
 # ghorgsync
 
-Clone and update all organization repositories in one folder, with clean-state and branch audits plus warnings for stray content.
+Clone and update all organization or user account repositories in one folder, with clean-state and branch audits plus warnings for stray content.
 
-**ghorgsync** is a command-line tool that synchronizes a local directory with the repositories in a GitHub organization. It clones missing repos, fetches and pulls existing ones, and audits their state noting if their state is clean or dirty and if they are not on the default branch — all in a single command.
+**ghorgsync** is a command-line tool that synchronizes a local directory with the repositories in a GitHub organization or user account. It clones missing repos, fetches and pulls existing ones, and audits their state noting if their state is clean or dirty and if they are not on the default branch — all in a single command.
 
 ## Key Features
 
 - **One command sync** — clones missing repos, fetches and pulls existing ones
+- **Organization and user accounts** — sync repos from a GitHub organization or a personal user account
 - **Non-destructive** — never deletes directories, discards local changes, or runs destructive git commands
 - **Dirty repo detection** — reports staged/unstaged changes with file details and line counts
 - **Branch drift audit** — detects and corrects default branch drift on clean repos

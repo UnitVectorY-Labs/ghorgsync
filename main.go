@@ -84,7 +84,12 @@ func main() {
 	token := github.ResolveToken()
 	client := github.NewClient(token)
 
-	allRepos, err := client.ListOrgRepos(cfg.Organization)
+	var allRepos []model.RepoInfo
+	if cfg.IsUserMode() {
+		allRepos, err = client.ListUserRepos(cfg.User)
+	} else {
+		allRepos, err = client.ListOrgRepos(cfg.Organization)
+	}
 	if err != nil {
 		printer.AuthError(err)
 		os.Exit(1)
