@@ -18,12 +18,20 @@ permalink: /examples
 
 ## Configuration Examples
 
-### Basic Configuration
+### Basic Organization Configuration
 
 Sync all repositories (public and private) in an organization:
 
 ```yaml
 organization: my-org
+```
+
+### Basic User Configuration
+
+Sync all repositories for a GitHub user account:
+
+```yaml
+user: my-username
 ```
 
 ### Public Repositories Only
@@ -32,6 +40,13 @@ Exclude private repositories from syncing:
 
 ```yaml
 organization: my-org
+include_private: false
+```
+
+This works the same way for user accounts:
+
+```yaml
+user: my-username
 include_private: false
 ```
 
@@ -269,7 +284,7 @@ If you run **ghorgsync** in a directory without a `.ghorgsync` file:
 No .ghorgsync configuration file found in the current directory.
 ```
 
-The command exits with code `0`. Create a `.ghorgsync` file with at least the `organization` field to proceed.
+The command exits with code `0`. Create a `.ghorgsync` file with either an `organization` or `user` field to proceed.
 
 ### Authentication Errors
 
@@ -292,7 +307,11 @@ gh auth login
 If the configuration file is invalid:
 
 ```
-  system  config  [error] organization is required
+  system  config  [error] one of organization or user is required
+```
+
+```
+  system  config  [error] organization and user are mutually exclusive; specify one but not both
 ```
 
 ```

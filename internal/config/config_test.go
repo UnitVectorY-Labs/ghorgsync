@@ -67,10 +67,10 @@ func TestValidateMissingOrganization(t *testing.T) {
 	cfg := &Config{}
 	err := cfg.Validate()
 	if err == nil {
-		t.Fatal("expected error for missing organization")
+		t.Fatal("expected error for missing organization and user")
 	}
-	if err.Error() != "organization is required" {
-		t.Errorf("error = %q, want %q", err.Error(), "organization is required")
+	if err.Error() != "one of organization or user is required" {
+		t.Errorf("error = %q, want %q", err.Error(), "one of organization or user is required")
 	}
 }
 
@@ -172,6 +172,73 @@ IncludeArchived: boolPtr(false),
 if cfg.ShouldIncludeArchived() {
 t.Error("ShouldIncludeArchived() = true, want false when explicitly set to false")
 }
+}
+
+func TestValidateUserConfig(t *testing.T) {
+	cfg := &Config{User: "my-user"}
+	err := cfg.Validate()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateBothOrganizationAndUser(t *testing.T) {
+	cfg := &Config{Organization: "my-org", User: "my-user"}
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected error when both organization and user are set")
+	}
+	want := "organization and user are mutually exclusive; specify one but not both"
+	if err.Error() != want {
+		t.Errorf("error = %q, want %q", err.Error(), want)
+	}
+}
+
+func TestOwnerReturnsOrganization(t *testing.T) {
+	cfg := &Config{Organization: "my-org"}
+	if cfg.Owner() != "my-org" {
+		t.Errorf("Owner() = %q, want %q", cfg.Owner(), "my-org")
+	}
+}
+
+func TestOwnerReturnsUser(t *testing.T) {
+	cfg := &Config{User: "my-user"}
+	if cfg.Owner() != "my-user" {
+		t.Errorf("Owner() = %q, want %q", cfg.Owner(), "my-user")
+	}
+}
+
+func TestIsUserMode(t *testing.T) {
+	orgCfg := &Config{Organization: "my-org"}
+	if orgCfg.IsUserMode() {
+		t.Error("IsUserMode() = true, want false for organization config")
+	}
+	userCfg := &Config{User: "my-user"}
+	if !userCfg.IsUserMode() {
+		t.Error("IsUserMode() = false, want true for user config")
+	}
+}
+
+func TestLoadUserConfig(t *testing.T) {
+	yaml := `
+user: my-user
+include_public: true
+include_private: false
+`
+	path := writeTestConfig(t, yaml)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.User != "my-user" {
+		t.Errorf("User = %q, want %q", cfg.User, "my-user")
+	}
+	if cfg.Organization != "" {
+		t.Errorf("Organization = %q, want empty", cfg.Organization)
+	}
+	if !cfg.IsUserMode() {
+		t.Error("IsUserMode() = false, want true")
+	}
 }
 
 func TestLoadConfigWithIncludeArchived(t *testing.T) {

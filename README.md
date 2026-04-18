@@ -2,15 +2,16 @@
 
 # ghorgsync
 
-Clone and update all organization repositories in one folder, with clean-state and branch audits plus warnings for stray content.
+Clone and update all organization or user account repositories in one folder, with clean-state and branch audits plus warnings for stray content.
 
 ## Why ghorgsync?
 
-Working with many repositories across a GitHub organization means constantly cloning new repos, pulling updates, and keeping track of local state. **ghorgsync** automates this into a single command that keeps your local directory in sync with your organization's repositories—safely and non-destructively.
+Working with many repositories across a GitHub organization or user account means constantly cloning new repos, pulling updates, and keeping track of local state. **ghorgsync** automates this into a single command that keeps your local directory in sync with your organization's or user's repositories—safely and non-destructively.
 
 ## Key Features
 
 - **One command sync** — clones missing repos, fetches and pulls existing ones, all in one pass
+- **Organization and user accounts** — sync repos from a GitHub organization or a personal user account
 - **Non-destructive** — never deletes directories, discards local changes, or runs destructive git commands
 - **Dirty repo detection** — reports staged/unstaged changes with file details and line counts
 - **Branch drift audit** — detects when a repo isn't on its default branch and corrects clean repos automatically
@@ -28,8 +29,16 @@ Working with many repositories across a GitHub organization means constantly clo
 
 2. **Configure:** create a `.ghorgsync` file in the directory where your repos live:
 
+   For an organization:
+
    ```yaml
    organization: my-org
+   ```
+
+   Or for a user account:
+
+   ```yaml
+   user: my-username
    ```
 
 3. **Authenticate:** set a GitHub token (or login with `gh auth login`):

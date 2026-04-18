@@ -24,15 +24,19 @@ permalink: /usage
 
 | Option | Type | Default | Description |
 |---|---|---|---|
-| `organization` | string | *(required)* | GitHub organization name to sync |
+| `organization` | string | — | GitHub organization name to sync (mutually exclusive with `user`) |
+| `user` | string | — | GitHub user account name to sync (mutually exclusive with `organization`) |
 | `include_public` | boolean | `true` | Include public repositories |
 | `include_private` | boolean | `true` | Include private repositories |
 | `include_archived` | boolean | `false` | Include archived repositories |
 | `exclude_repos` | array | `[]` | Repository names or regex patterns to exclude |
 
+{: .highlight }
+Exactly one of `organization` or `user` must be specified. They cannot both be set.
+
 ### Exclude Patterns
 
-The `exclude_repos` list supports both exact names and regular expressions. Patterns are matched against the repository name only (not the full URL or organization-qualified path).
+The `exclude_repos` list supports both exact names and regular expressions. Patterns are matched against the repository name only (not the full URL or owner-qualified path).
 
 ```yaml
 exclude_repos:
@@ -45,7 +49,7 @@ Invalid regex patterns produce a clear configuration error that identifies the o
 
 ### Configuration Validation
 
-- `organization` is required; the command exits with an error if it is missing or empty.
+- Exactly one of `organization` or `user` is required; the command exits with an error if both are set, or neither is set.
 - Setting both `include_public` and `include_private` to `false` is invalid.
 - Invalid YAML produces a clear error message.
 
@@ -80,7 +84,7 @@ When invoked, **ghorgsync** performs the following steps:
 
 1. **Load configuration** from `.ghorgsync` and validate it.
 2. **Resolve authentication** and connect to the GitHub API. See [Installation](INSTALL.md#prerequisites) for configuring authentication.
-3. **Fetch the organization repository list** including default branch metadata.
+3. **Fetch the repository list** from the GitHub organization or user account, including default branch metadata.
 4. **Filter repositories** by visibility (`include_public`/`include_private`), archived status (`include_archived`), and exclusion patterns.
 5. **Scan the local directory** and classify child entries (see [Local Directory Classification](#local-directory-classification)).
 6. **Clone missing repositories**.
@@ -99,7 +103,7 @@ During the repository clone/process phase, **ghorgsync** shows a live progress b
 When invoked with `--clone`, **ghorgsync** runs a streamlined workflow focused exclusively on cloning missing repositories:
 
 1. **Load configuration** and **resolve authentication** (same as default mode).
-2. **Fetch the organization repository list** and **filter repositories** (same as default mode).
+2. **Fetch the repository list** and **filter repositories** (same as default mode).
 3. **Scan the local directory** to identify which included repositories are missing.
 4. **Clone missing repositories** only.
 5. **Print a summary line** with counts.
@@ -110,14 +114,14 @@ When invoked with `--clone`, **ghorgsync** runs a streamlined workflow focused e
 - Collisions, unknown folders, and excluded-but-present findings are not reported.
 - The progress bar only covers missing repositories to clone.
 
-This mode is useful when you know a new repository has been added to the organization and you want to quickly pull it down without waiting for every existing repository to be fetched and checked.
+This mode is useful when you know a new repository has been added to the organization or user account and you want to quickly pull it down without waiting for every existing repository to be fetched and checked.
 
 ### Status Mode
 
 When invoked with `--status`, **ghorgsync** runs a read-only workflow that reports which repositories are dirty or not on their default branch:
 
 1. **Load configuration** and **resolve authentication** (same as default mode).
-2. **Fetch the organization repository list** and **filter repositories** (same as default mode).
+2. **Fetch the repository list** and **filter repositories** (same as default mode).
 3. **Scan the local directory** to identify which included repositories exist locally.
 4. **Check each existing repository** for dirty state and branch drift.
 5. **Print only repositories that are dirty or not on their default branch.**
@@ -215,7 +219,7 @@ Audit findings are user-facing warnings, not command failures.
 | Classification | Description |
 |---|---|
 | **Managed** | Corresponds to an included GitHub repository. Cloned if missing; synced/audited if present. |
-| **Unknown** | A directory that does not match any repository (included or excluded) in the organization. |
+| **Unknown** | A directory that does not match any repository (included or excluded) in the organization or user account. |
 | **Excluded-but-present** | A directory matching a repository excluded by name or pattern. Reported but not modified. |
 | **Collision** | A managed repo path exists but is not a usable git clone (e.g., a regular file, non-git directory, or remote mismatch). Reported and skipped. |
 
