@@ -57,10 +57,9 @@ type ghRepo struct {
 	Archived      bool   `json:"archived"`
 }
 
-// ListOrgRepos lists all repositories for the given organisation.
-func (c *Client) ListOrgRepos(org string) ([]model.RepoInfo, error) {
+// listRepos fetches all repositories from the given paginated GitHub API URL.
+func (c *Client) listRepos(url string) ([]model.RepoInfo, error) {
 	var repos []model.RepoInfo
-	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&page=1", org)
 
 	for url != "" {
 		req, err := http.NewRequest("GET", url, nil)
@@ -109,56 +108,16 @@ func (c *Client) ListOrgRepos(org string) ([]model.RepoInfo, error) {
 	return repos, nil
 }
 
+// ListOrgRepos lists all repositories for the given organisation.
+func (c *Client) ListOrgRepos(org string) ([]model.RepoInfo, error) {
+	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&page=1", org)
+	return c.listRepos(url)
+}
+
 // ListUserRepos lists all repositories for the given user account.
 func (c *Client) ListUserRepos(username string) ([]model.RepoInfo, error) {
-	var repos []model.RepoInfo
 	url := fmt.Sprintf("https://api.github.com/users/%s/repos?per_page=100&page=1", username)
-
-	for url != "" {
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			return nil, fmt.Errorf("creating request: %w", err)
-		}
-		req.Header.Set("Accept", "application/vnd.github+json")
-		if c.token != "" {
-			req.Header.Set("Authorization", "Bearer "+c.token)
-		}
-
-		resp, err := c.httpClient.Do(req)
-		if err != nil {
-			return nil, fmt.Errorf("requesting repos: %w", err)
-		}
-
-		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-			resp.Body.Close()
-			return nil, fmt.Errorf("GitHub API auth error (HTTP %d): check your token", resp.StatusCode)
-		}
-		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			resp.Body.Close()
-			return nil, fmt.Errorf("GitHub API error (HTTP %d)", resp.StatusCode)
-		}
-
-		var page []ghRepo
-		if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
-			resp.Body.Close()
-			return nil, fmt.Errorf("decoding response: %w", err)
-		}
-		resp.Body.Close()
-
-		for _, r := range page {
-			repos = append(repos, model.RepoInfo{
-				Name:          r.Name,
-				CloneURL:      r.CloneURL,
-				DefaultBranch: r.DefaultBranch,
-				IsPrivate:     r.Private,
-				IsArchived:    r.Archived,
-			})
-		}
-
-		url = nextLink(resp.Header.Get("Link"))
-	}
-
-	return repos, nil
+	return c.listRepos(url)
 }
 
 // nextLink parses the GitHub Link header and returns the URL for rel="next", or "".

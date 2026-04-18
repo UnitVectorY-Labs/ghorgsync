@@ -63,6 +63,8 @@ func (c *Config) Validate() error {
 }
 
 // Owner returns the configured organization or user name.
+// This should only be called after Validate() has confirmed that exactly one of
+// Organization or User is set.
 func (c *Config) Owner() string {
 	if c.Organization != "" {
 		return c.Organization
