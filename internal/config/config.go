@@ -70,8 +70,10 @@ func (c *Config) Validate() error {
 
 		hintType := strings.ToLower(strings.TrimSpace(c.BranchHint.Type))
 		switch hintType {
-		case "json", "yaml", "yml":
+		case "json", "yaml":
 			c.BranchHint.Type = hintType
+		case "yml":
+			c.BranchHint.Type = "yaml"
 		default:
 			return fmt.Errorf("branch_hint.type must be one of json or yaml")
 		}

@@ -47,18 +47,12 @@ func lookupHintString(document any, path string) string {
 		}
 
 		switch typed := current.(type) {
-		case map[string]any:
-			var ok bool
-			current, ok = typed[segment]
+		case map[string]any, map[any]any:
+			next, ok := lookupHintMapValue(typed, segment)
 			if !ok {
 				return ""
 			}
-		case map[any]any:
-			var ok bool
-			current, ok = typed[segment]
-			if !ok {
-				return ""
-			}
+			current = next
 		case []any:
 			index, err := strconv.Atoi(segment)
 			if err != nil || index < 0 || index >= len(typed) {
@@ -76,4 +70,17 @@ func lookupHintString(document any, path string) string {
 	}
 
 	return strings.TrimSpace(value)
+}
+
+func lookupHintMapValue(current any, segment string) (any, bool) {
+	switch typed := current.(type) {
+	case map[string]any:
+		value, ok := typed[segment]
+		return value, ok
+	case map[any]any:
+		value, ok := typed[segment]
+		return value, ok
+	default:
+		return nil, false
+	}
 }
