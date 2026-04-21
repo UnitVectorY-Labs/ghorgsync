@@ -12,30 +12,32 @@ import (
 
 // mockGitRunner is a test double for GitRunner.
 type mockGitRunner struct {
-	currentBranch string
-	branchErr     error
-	dirty         bool
-	dirtyFiles    []model.DirtyFile
-	dirtyErr      error
-	statusOutput  string
-	statusErr     error
-	pullChanged   bool
-	pullErr       error
-	checkoutErr   error
+	currentBranch  string
+	branchErr      error
+	dirty          bool
+	dirtyFiles     []model.DirtyFile
+	dirtyErr       error
+	statusOutput   string
+	statusErr      error
+	pullChanged    bool
+	pullErr        error
+	checkoutErr    error
 	checkoutBranch string
 }
 
-func (m *mockGitRunner) Clone(url, dest string) error                         { return nil }
-func (m *mockGitRunner) Fetch(repoDir string) error                           { return nil }
-func (m *mockGitRunner) SubmoduleUpdate(repoDir string) error                 { return nil }
+func (m *mockGitRunner) Clone(url, dest string) error         { return nil }
+func (m *mockGitRunner) Fetch(repoDir string) error           { return nil }
+func (m *mockGitRunner) SubmoduleUpdate(repoDir string) error { return nil }
 func (m *mockGitRunner) Checkout(repoDir, branch string) error {
 	m.checkoutBranch = branch
 	return m.checkoutErr
 }
-func (m *mockGitRunner) PullFF(repoDir string) (bool, error) { return m.pullChanged, m.pullErr }
-func (m *mockGitRunner) RemoteURL(repoDir string) (string, error)             { return "", nil }
-func (m *mockGitRunner) DiffStats(repoDir string) (int, int, error)           { return 0, 0, nil }
-func (m *mockGitRunner) CurrentBranch(repoDir string) (string, error)         { return m.currentBranch, m.branchErr }
+func (m *mockGitRunner) PullFF(repoDir string) (bool, error)        { return m.pullChanged, m.pullErr }
+func (m *mockGitRunner) RemoteURL(repoDir string) (string, error)   { return "", nil }
+func (m *mockGitRunner) DiffStats(repoDir string) (int, int, error) { return 0, 0, nil }
+func (m *mockGitRunner) CurrentBranch(repoDir string) (string, error) {
+	return m.currentBranch, m.branchErr
+}
 func (m *mockGitRunner) IsDirty(repoDir string) (bool, []model.DirtyFile, error) {
 	return m.dirty, m.dirtyFiles, m.dirtyErr
 }
@@ -167,7 +169,7 @@ func TestStatusRepo_UsesBranchHintWhenAvailable(t *testing.T) {
 	}
 
 	eng := &Engine{
-		Git: &mockGitRunner{currentBranch: "release"},
+		Git:     &mockGitRunner{currentBranch: "release"},
 		BaseDir: baseDir,
 		BranchHint: &config.BranchHint{
 			Path:     ".repo-metadata.yaml",

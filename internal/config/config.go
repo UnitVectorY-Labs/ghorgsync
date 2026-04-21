@@ -18,12 +18,12 @@ type BranchHint struct {
 
 // Config represents the application configuration loaded from a YAML file.
 type Config struct {
-	Organization    string   `yaml:"organization"`
-	User            string   `yaml:"user"`
-	IncludePublic   *bool    `yaml:"include_public"`
-	IncludePrivate  *bool    `yaml:"include_private"`
-	IncludeArchived *bool    `yaml:"include_archived"`
-	ExcludeRepos    []string `yaml:"exclude_repos"`
+	Organization    string      `yaml:"organization"`
+	User            string      `yaml:"user"`
+	IncludePublic   *bool       `yaml:"include_public"`
+	IncludePrivate  *bool       `yaml:"include_private"`
+	IncludeArchived *bool       `yaml:"include_archived"`
+	ExcludeRepos    []string    `yaml:"exclude_repos"`
 	BranchHint      *BranchHint `yaml:"branch_hint"`
 
 	// compiledExcludes caches compiled regex patterns for ExcludeRepos.
