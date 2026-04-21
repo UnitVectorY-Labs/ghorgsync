@@ -28,6 +28,10 @@ include_private: true
 exclude_repos:
   - legacy-repo
   - "^sandbox-"
+branch_hint:
+  path: .repo-metadata.yaml
+  type: yaml
+  json_path: defaults.branch
 `
 	path := writeTestConfig(t, yaml)
 	cfg, err := Load(path)
@@ -45,6 +49,18 @@ exclude_repos:
 	}
 	if len(cfg.ExcludeRepos) != 2 {
 		t.Errorf("ExcludeRepos length = %d, want 2", len(cfg.ExcludeRepos))
+	}
+	if cfg.BranchHint == nil {
+		t.Fatal("BranchHint = nil, want populated")
+	}
+	if cfg.BranchHint.Path != ".repo-metadata.yaml" {
+		t.Errorf("BranchHint.Path = %q, want %q", cfg.BranchHint.Path, ".repo-metadata.yaml")
+	}
+	if cfg.BranchHint.Type != "yaml" {
+		t.Errorf("BranchHint.Type = %q, want %q", cfg.BranchHint.Type, "yaml")
+	}
+	if cfg.BranchHint.JSONPath != "defaults.branch" {
+		t.Errorf("BranchHint.JSONPath = %q, want %q", cfg.BranchHint.JSONPath, "defaults.branch")
 	}
 }
 
@@ -242,19 +258,92 @@ include_private: false
 }
 
 func TestLoadConfigWithIncludeArchived(t *testing.T) {
-yaml := `
+	yaml := `
 organization: my-org
 include_archived: true
 `
-path := writeTestConfig(t, yaml)
-cfg, err := Load(path)
-if err != nil {
-t.Fatalf("unexpected error: %v", err)
+	path := writeTestConfig(t, yaml)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.IncludeArchived == nil || !*cfg.IncludeArchived {
+		t.Errorf("IncludeArchived = %v, want true", cfg.IncludeArchived)
+	}
+	if !cfg.ShouldIncludeArchived() {
+		t.Error("ShouldIncludeArchived() = false, want true")
+	}
 }
-if cfg.IncludeArchived == nil || !*cfg.IncludeArchived {
-t.Errorf("IncludeArchived = %v, want true", cfg.IncludeArchived)
+
+func TestValidateBranchHintValid(t *testing.T) {
+	cfg := &Config{
+		Organization: "my-org",
+		BranchHint: &BranchHint{
+			Path:     ".repo-metadata.json",
+			Type:     "JSON",
+			JSONPath: "default.branch",
+		},
+	}
+
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.BranchHint.Type != "json" {
+		t.Errorf("BranchHint.Type = %q, want %q", cfg.BranchHint.Type, "json")
+	}
 }
-if !cfg.ShouldIncludeArchived() {
-t.Error("ShouldIncludeArchived() = false, want true")
+
+func TestValidateBranchHintMissingPath(t *testing.T) {
+	cfg := &Config{
+		Organization: "my-org",
+		BranchHint: &BranchHint{
+			Type:     "yaml",
+			JSONPath: "default.branch",
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected error for missing branch_hint.path")
+	}
+	if err.Error() != "branch_hint.path is required when branch_hint is specified" {
+		t.Errorf("error = %q", err.Error())
+	}
 }
+
+func TestValidateBranchHintMissingJSONPath(t *testing.T) {
+	cfg := &Config{
+		Organization: "my-org",
+		BranchHint: &BranchHint{
+			Path: ".repo-metadata.yaml",
+			Type: "yaml",
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected error for missing branch_hint.json_path")
+	}
+	if err.Error() != "branch_hint.json_path is required when branch_hint is specified" {
+		t.Errorf("error = %q", err.Error())
+	}
+}
+
+func TestValidateBranchHintInvalidType(t *testing.T) {
+	cfg := &Config{
+		Organization: "my-org",
+		BranchHint: &BranchHint{
+			Path:     ".repo-metadata.txt",
+			Type:     "toml",
+			JSONPath: "default.branch",
+		},
+	}
+
+	err := cfg.Validate()
+	if err == nil {
+		t.Fatal("expected error for invalid branch_hint.type")
+	}
+	if err.Error() != "branch_hint.type must be one of json or yaml" {
+		t.Errorf("error = %q", err.Error())
+	}
 }
