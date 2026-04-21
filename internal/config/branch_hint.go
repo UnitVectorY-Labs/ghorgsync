@@ -22,25 +22,25 @@ func ResolveBranchHint(repoDir string, hint *BranchHint) string {
 		return ""
 	}
 
-	var document any
+	var parsedData any
 	switch strings.ToLower(strings.TrimSpace(hint.Type)) {
 	case "json":
-		if err := json.Unmarshal(data, &document); err != nil {
+		if err := json.Unmarshal(data, &parsedData); err != nil {
 			return ""
 		}
 	case "yaml", "yml":
-		if err := yaml.Unmarshal(data, &document); err != nil {
+		if err := yaml.Unmarshal(data, &parsedData); err != nil {
 			return ""
 		}
 	default:
 		return ""
 	}
 
-	return lookupHintString(document, hint.JSONPath)
+	return lookupHintString(parsedData, hint.JSONPath)
 }
 
-func lookupHintString(document any, path string) string {
-	current := document
+func lookupHintString(parsedData any, path string) string {
+	current := parsedData
 	for _, segment := range strings.Split(path, ".") {
 		if segment == "" {
 			return ""
