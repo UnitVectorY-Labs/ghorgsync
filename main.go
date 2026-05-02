@@ -35,7 +35,6 @@ func main() {
 	noColorFlag := flag.Bool("no-color", false, "Disable color output")
 	cloneOnlyFlag := flag.Bool("clone", false, "Only clone missing repositories (skip processing existing repos)")
 	statusFlag := flag.Bool("status", false, "Show status of repositories (dirty repos and branch drift only)")
-	orgFlag := flag.String("org", "", "GitHub organization name (overrides config; falls back to GITHUB_ORG env var)")
 	flag.Parse()
 
 	// Mode flags are mutually exclusive
@@ -76,17 +75,6 @@ func main() {
 		printer.ConfigError(err)
 		os.Exit(1)
 	}
-
-	// Apply --org flag or GITHUB_ORG env var override
-	resolvedOrg := *orgFlag
-	if resolvedOrg == "" {
-		resolvedOrg = os.Getenv("GITHUB_ORG")
-	}
-	if resolvedOrg != "" {
-		cfg.Organization = resolvedOrg
-		cfg.User = ""
-	}
-
 	if err := cfg.Validate(); err != nil {
 		printer.ConfigError(err)
 		os.Exit(1)
