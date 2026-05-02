@@ -65,12 +65,23 @@ ghorgsync [flags]
 | `--version` | Print version and exit |
 | `--verbose` | Enable verbose output (show per-repository processing detail) |
 | `--no-color` | Disable color output |
+| `--org` | GitHub organization name; overrides the `organization` field in the config file (falls back to `GITHUB_ORG` env var when the flag is not provided) |
 | `--clone` | Clone-only mode: only clone missing repositories (see [Clone-Only Mode](#clone-only-mode)) |
 | `--status` | Status mode: show only dirty repos and branch drift (see [Status Mode](#status-mode)) |
 
 ### Mode Flags
 
 The `--clone` and `--status` flags are mode flags that change the sync behavior. Mode flags are mutually exclusive; if multiple mode flags are provided, the command exits with an error.
+
+### Organization Override
+
+The `--org` flag and `GITHUB_ORG` environment variable both provide a way to specify the GitHub organization without editing the config file. The resolution order is:
+
+1. `--org` flag (highest priority)
+2. `GITHUB_ORG` environment variable
+3. `organization` field in the `.ghorgsync` config file
+
+When `--org` or `GITHUB_ORG` is in effect, it sets the organization and clears any `user` value that may have been present in the config file.
 
 ## Runtime Behavior
 
