@@ -19,9 +19,12 @@ func TestListRepos_VerboseLogsRequestsAndResponses(t *testing.T) {
 	defer server.Close()
 
 	var logs []string
-	client := NewClient("super-secret-token", func(format string, args ...interface{}) {
-		logs = append(logs, fmt.Sprintf(format, args...))
-	})
+	client := NewClient("super-secret-token",
+		func(format string, args ...interface{}) {
+			logs = append(logs, fmt.Sprintf(format, args...))
+		},
+		nil, // no trace logger for this test
+	)
 	client.httpClient = server.Client()
 
 	repos, err := client.listRepos(server.URL + "?per_page=100&page=1")
@@ -50,6 +53,67 @@ func TestListRepos_VerboseLogsRequestsAndResponses(t *testing.T) {
 	}
 	if strings.Contains(joined, "super-secret-token") {
 		t.Fatalf("token leaked in verbose logs: %s", joined)
+	}
+}
+
+func TestListRepos_TraceLogsResponseBody(t *testing.T) {
+	repoJSON := `[{"name":"trace-repo","clone_url":"https://github.com/acme/trace-repo.git","default_branch":"main","private":false,"archived":false}]`
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, repoJSON)
+	}))
+	defer server.Close()
+
+	var traceLogs []string
+	client := NewClient("token",
+		func(format string, args ...interface{}) {}, // level-1 logger (discarded)
+		func(format string, args ...interface{}) {
+			traceLogs = append(traceLogs, fmt.Sprintf(format, args...))
+		},
+	)
+	client.httpClient = server.Client()
+
+	repos, err := client.listRepos(server.URL + "?per_page=100&page=1")
+	if err != nil {
+		t.Fatalf("listRepos returned error: %v", err)
+	}
+	if len(repos) != 1 || repos[0].Name != "trace-repo" {
+		t.Fatalf("unexpected repos: %+v", repos)
+	}
+
+	joined := strings.Join(traceLogs, "\n")
+	if !strings.Contains(joined, "api body:") {
+		t.Fatalf("expected 'api body:' prefix in trace logs, got: %s", joined)
+	}
+	if !strings.Contains(joined, "trace-repo") {
+		t.Fatalf("expected response body content in trace logs, got: %s", joined)
+	}
+}
+
+func TestListRepos_NoTraceLogger_BodyNotLogged(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `[{"name":"repo-x","clone_url":"https://github.com/acme/repo-x.git","default_branch":"main","private":false,"archived":false}]`)
+	}))
+	defer server.Close()
+
+	var logs []string
+	// Pass nil tracef — body must not appear in level-1 logs
+	client := NewClient("token",
+		func(format string, args ...interface{}) {
+			logs = append(logs, fmt.Sprintf(format, args...))
+		},
+		nil,
+	)
+	client.httpClient = server.Client()
+
+	_, err := client.listRepos(server.URL + "?per_page=100&page=1")
+	if err != nil {
+		t.Fatalf("listRepos returned error: %v", err)
+	}
+	joined := strings.Join(logs, "\n")
+	if strings.Contains(joined, "api body:") {
+		t.Fatalf("api body should not appear in level-1 logs when tracef is nil, got: %s", joined)
 	}
 }
 

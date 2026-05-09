@@ -18,6 +18,21 @@ import (
 
 var Version = "dev" // This will be set by the build systems to the release version
 
+// countFlag is a flag.Value that counts how many times --verbose is repeated.
+// Implements IsBoolFlag so it can be used without an explicit value (--verbose).
+type countFlag int
+
+func (c *countFlag) String() string   { return fmt.Sprintf("%d", int(*c)) }
+func (c *countFlag) IsBoolFlag() bool { return true }
+func (c *countFlag) Set(s string) error {
+	if s == "false" {
+		*c = 0
+		return nil
+	}
+	*c++
+	return nil
+}
+
 // main is the entry point for the ghorgsync command-line tool.
 func main() {
 	// Set the build version from the build info if not set by the build system
@@ -31,7 +46,8 @@ func main() {
 
 	// Parse flags
 	versionFlag := flag.Bool("version", false, "Print version and exit")
-	verboseFlag := flag.Bool("verbose", false, "Enable verbose output")
+	var verbosity countFlag
+	flag.Var(&verbosity, "verbose", "Enable verbose output; repeat (--verbose --verbose) for trace-level detail including raw command output and API response bodies")
 	noColorFlag := flag.Bool("no-color", false, "Disable color output")
 	cloneOnlyFlag := flag.Bool("clone", false, "Only clone missing repositories (skip processing existing repos)")
 	statusFlag := flag.Bool("status", false, "Show status of repositories (dirty repos and branch drift only)")
@@ -49,7 +65,7 @@ func main() {
 	}
 
 	useColor := !*noColorFlag && output.ShouldColor()
-	printer := output.NewPrinter(useColor, *verboseFlag)
+	printer := output.NewPrinter(useColor, int(verbosity))
 
 	// Startup gate: check for dotfile
 	exePath, err := os.Executable()
@@ -82,7 +98,7 @@ func main() {
 
 	// Resolve token and create GitHub client
 	token := github.ResolveToken()
-	client := github.NewClient(token, printer.Verbose)
+	client := github.NewClient(token, printer.Verbose, printer.Trace)
 
 	var allRepos []model.RepoInfo
 	if cfg.IsUserMode() {
@@ -108,7 +124,7 @@ func main() {
 	}
 
 	// Create sync engine
-	eng := sync.NewEngine(dir, *verboseFlag, printer.Verbose)
+	eng := sync.NewEngine(dir, int(verbosity), printer.Verbose, printer.Trace)
 
 	// Build lookup map from repo name → RepoInfo
 	repoMap := make(map[string]model.RepoInfo, len(included))
