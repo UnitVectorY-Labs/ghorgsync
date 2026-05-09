@@ -16,7 +16,7 @@ Working with many repositories across a GitHub organization or user account mean
 - **Dirty repo detection** — reports staged/unstaged changes with file details and line counts
 - **Branch drift audit** — detects when a repo isn't on its default branch and corrects clean repos automatically
 - **Stray content warnings** — identifies unknown folders and excluded-but-present repos in your directory
-- **Quiet by default** — only prints actions taken and findings; verbose mode available for full detail
+- **Quiet by default** — only prints actions taken and findings; `--verbose` adds API and git command diagnostics
 - **Colorized output** — structured, color-coded terminal output (honors `NO_COLOR`)
 
 ## Quick Start

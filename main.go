@@ -82,7 +82,7 @@ func main() {
 
 	// Resolve token and create GitHub client
 	token := github.ResolveToken()
-	client := github.NewClient(token)
+	client := github.NewClient(token, printer.Verbose)
 
 	var allRepos []model.RepoInfo
 	if cfg.IsUserMode() {
@@ -108,7 +108,7 @@ func main() {
 	}
 
 	// Create sync engine
-	eng := sync.NewEngine(dir, *verboseFlag)
+	eng := sync.NewEngine(dir, *verboseFlag, printer.Verbose)
 
 	// Build lookup map from repo name → RepoInfo
 	repoMap := make(map[string]model.RepoInfo, len(included))

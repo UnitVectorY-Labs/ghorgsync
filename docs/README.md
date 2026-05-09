@@ -19,5 +19,5 @@ Clone and update all organization or user account repositories in one folder, wi
 - **Dirty repo detection** — reports staged/unstaged changes with file details and line counts
 - **Branch drift audit** — detects and corrects default branch drift on clean repos
 - **Stray content warnings** — identifies unknown folders and excluded-but-present repos
-- **Quiet by default** — only prints actions and findings; verbose mode for full detail
+- **Quiet by default** — only prints actions and findings; `--verbose` adds API and git command diagnostics
 - **Colorized output** — structured, color-coded terminal output (honors `NO_COLOR`)

@@ -14,9 +14,14 @@ type Engine struct {
 }
 
 // NewEngine creates a new sync engine.
-func NewEngine(baseDir string, verbose bool) *Engine {
+func NewEngine(baseDir string, verbose bool, verbosef ...func(string, ...interface{})) *Engine {
+	gitRunner := GitRunner(&ExecGitRunner{})
+	if verbose && len(verbosef) > 0 && verbosef[0] != nil {
+		gitRunner = NewLoggingGitRunner(gitRunner, verbosef[0])
+	}
+
 	return &Engine{
-		Git:     &ExecGitRunner{},
+		Git:     gitRunner,
 		BaseDir: baseDir,
 		Verbose: verbose,
 	}
