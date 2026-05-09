@@ -54,10 +54,10 @@ func TestListRepos_VerboseLogsRequestsAndResponses(t *testing.T) {
 }
 
 func TestSanitizeRequestURL_RedactsSensitiveQueryValues(t *testing.T) {
-	url := "https://api.github.com/orgs/acme/repos?page=2&access_token=abc123&token=def456&other=value"
+	url := "https://api.github.com/orgs/acme/repos?page=2&access_token=abc123&token=super-secret-token&other=value"
 	sanitized := sanitizeRequestURL(url)
 
-	if strings.Contains(sanitized, "abc123") || strings.Contains(sanitized, "def456") {
+	if strings.Contains(sanitized, "abc123") || strings.Contains(sanitized, "super-secret-token") {
 		t.Fatalf("sensitive query values leaked: %s", sanitized)
 	}
 	if !strings.Contains(sanitized, "access_token=%5BREDACTED%5D") {

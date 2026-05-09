@@ -137,6 +137,8 @@ func sanitizeRequestURL(rawURL string) string {
 
 	q := parsed.Query()
 	redacted := false
+	// Redact common auth-related query parameter names to avoid leaking secrets
+	// in verbose logs when users run against custom API gateways or proxies.
 	for _, key := range []string{"access_token", "token", "auth", "authorization"} {
 		if q.Has(key) {
 			q.Set(key, "[REDACTED]")

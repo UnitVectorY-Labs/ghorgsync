@@ -70,14 +70,16 @@ func (g *LoggingGitRunner) IsDirty(repoDir string) (bool, []model.DirtyFile, err
 }
 
 func (g *LoggingGitRunner) DiffStats(repoDir string) (int, int, error) {
-	cmd := fmt.Sprintf("git -C %s diff --cached --numstat && git -C %s diff --numstat", repoDir, repoDir)
-	g.logf("git cmd: %s", cmd)
+	stagedCmd := fmt.Sprintf("git -C %s diff --cached --numstat", repoDir)
+	unstagedCmd := fmt.Sprintf("git -C %s diff --numstat", repoDir)
+	g.logf("git cmd: %s", stagedCmd)
+	g.logf("git cmd: %s", unstagedCmd)
 	additions, deletions, err := g.next.DiffStats(repoDir)
 	if err != nil {
-		g.logResult(cmd, err)
+		g.logf("git result: diff stats -> error=%v", err)
 		return 0, 0, err
 	}
-	g.logf("git result: %s -> additions=%d deletions=%d", cmd, additions, deletions)
+	g.logf("git result: diff stats -> additions=%d deletions=%d", additions, deletions)
 	return additions, deletions, nil
 }
 
