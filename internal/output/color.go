@@ -67,18 +67,18 @@ func digitCount(n int) int {
 // Printer handles formatted output with optional color support.
 type Printer struct {
 	color        bool
-	verbose      bool
+	verbosity    int // 0=quiet, 1=verbose, 2=trace
 	interactive  bool
 	repoProgress repoProgressState
 }
 
 // NewPrinter creates a new Printer.
 // color: whether to enable ANSI color output
-// verbose: whether to show verbose output
-func NewPrinter(color bool, verbose bool) *Printer {
+// verbosity: 0=quiet, 1=verbose, 2=trace
+func NewPrinter(color bool, verbosity int) *Printer {
 	return &Printer{
 		color:       color,
-		verbose:     verbose,
+		verbosity:   verbosity,
 		interactive: IsTerminalOutput(),
 	}
 }
@@ -273,14 +273,28 @@ func (p *Printer) Header(text string) {
 	})
 }
 
-// Verbose prints a message only in verbose mode.
+// Verbose prints a message only in verbose mode (verbosity >= 1).
 func (p *Printer) Verbose(format string, args ...interface{}) {
-	if !p.verbose {
+	if p.verbosity < 1 {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
 	p.withProgressSuspended(func() {
 		fmt.Println(p.colorize(gray, "  "+msg))
+	})
+}
+
+// Trace prints a message only in trace mode (verbosity >= 2).
+// Multi-line messages are indented line-by-line.
+func (p *Printer) Trace(format string, args ...interface{}) {
+	if p.verbosity < 2 {
+		return
+	}
+	msg := fmt.Sprintf(format, args...)
+	p.withProgressSuspended(func() {
+		for _, line := range strings.Split(strings.TrimRight(msg, "\n"), "\n") {
+			fmt.Println(p.colorize(gray, "  "+line))
+		}
 	})
 }
 

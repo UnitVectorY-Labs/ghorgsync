@@ -1,9 +1,12 @@
 package github
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"strings"
@@ -16,16 +19,21 @@ import (
 type Client struct {
 	token      string
 	httpClient *http.Client
+	verbosef   func(string, ...interface{})
+	tracef     func(string, ...interface{})
 }
 
 // NewClient creates a new GitHub API client.
 // It resolves a token from GITHUB_TOKEN, GH_TOKEN env vars, or gh CLI auth.
-func NewClient(token string) *Client {
+// logf is called for verbose (level-1) messages; tracef for trace (level-2) messages.
+func NewClient(token string, logf func(string, ...interface{}), tracef func(string, ...interface{})) *Client {
 	return &Client{
 		token: token,
 		httpClient: &http.Client{
 			Timeout: 30 * time.Second,
 		},
+		verbosef: logf,
+		tracef:   tracef,
 	}
 }
 
@@ -70,27 +78,33 @@ func (c *Client) listRepos(url string) ([]model.RepoInfo, error) {
 		if c.token != "" {
 			req.Header.Set("Authorization", "Bearer "+c.token)
 		}
+		c.verbosefSafe("api request: %s %s headers={Accept:%q Authorization:%t}",
+			req.Method, sanitizeRequestURL(url), req.Header.Get("Accept"), c.token != "")
 
 		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			return nil, fmt.Errorf("requesting repos: %w", err)
 		}
+		c.verbosefSafe("api response: %s %s status=%d", req.Method, sanitizeRequestURL(url), resp.StatusCode)
+
+		bodyBytes, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return nil, fmt.Errorf("reading response body: %w", err)
+		}
+		c.tracefSafe("api body: %s", bytes.TrimSpace(bodyBytes))
 
 		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-			resp.Body.Close()
 			return nil, fmt.Errorf("GitHub API auth error (HTTP %d): check your token", resp.StatusCode)
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-			resp.Body.Close()
 			return nil, fmt.Errorf("GitHub API error (HTTP %d)", resp.StatusCode)
 		}
 
 		var page []ghRepo
-		if err := json.NewDecoder(resp.Body).Decode(&page); err != nil {
-			resp.Body.Close()
+		if err := json.Unmarshal(bodyBytes, &page); err != nil {
 			return nil, fmt.Errorf("decoding response: %w", err)
 		}
-		resp.Body.Close()
 
 		for _, r := range page {
 			repos = append(repos, model.RepoInfo{
@@ -103,9 +117,49 @@ func (c *Client) listRepos(url string) ([]model.RepoInfo, error) {
 		}
 
 		url = nextLink(resp.Header.Get("Link"))
+		if url != "" {
+			c.verbosefSafe("api pagination: next=%s", sanitizeRequestURL(url))
+		}
 	}
 
 	return repos, nil
+}
+
+func (c *Client) verbosefSafe(format string, args ...interface{}) {
+	if c.verbosef == nil {
+		return
+	}
+	c.verbosef(format, args...)
+}
+
+func (c *Client) tracefSafe(format string, args ...interface{}) {
+	if c.tracef == nil {
+		return
+	}
+	c.tracef(format, args...)
+}
+
+func sanitizeRequestURL(rawURL string) string {
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		return rawURL
+	}
+
+	q := parsed.Query()
+	redacted := false
+	// Redact common auth-related query parameter names to avoid leaking secrets
+	// in verbose logs when users run against custom API gateways or proxies.
+	for _, key := range []string{"access_token", "token", "auth", "authorization"} {
+		if q.Has(key) {
+			q.Set(key, "[REDACTED]")
+			redacted = true
+		}
+	}
+	if redacted {
+		parsed.RawQuery = q.Encode()
+	}
+
+	return parsed.String()
 }
 
 // ListOrgRepos lists all repositories for the given organisation.

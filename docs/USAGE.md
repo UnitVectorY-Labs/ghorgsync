@@ -63,7 +63,7 @@ ghorgsync [flags]
 |---|---|
 | `--help` | Print usage information and exit |
 | `--version` | Print version and exit |
-| `--verbose` | Enable verbose output (show per-repository processing detail) |
+| `--verbose` | Enable verbose diagnostics output (GitHub API requests/responses and local git commands/results; sensitive auth values are redacted). Repeat the flag (`--verbose --verbose`) to enable trace-level output that additionally includes raw git command output and API response bodies. |
 | `--no-color` | Disable color output |
 | `--clone` | Clone-only mode: only clone missing repositories (see [Clone-Only Mode](#clone-only-mode)) |
 | `--status` | Status mode: show only dirty repos and branch drift (see [Status Mode](#status-mode)) |
@@ -190,7 +190,18 @@ When stdout is a TTY, a live progress bar is shown during repository processing.
 
 ### Verbose Mode
 
-Use `--verbose` to see additional per-repository processing detail, such as the total number of repositories found and filtered.
+Use `--verbose` to emit diagnostic details about runtime operations, including:
+
+- GitHub API interactions (request method/URL and response status, including pagination steps)
+- Local git commands executed for each repository interaction and the corresponding exit code and structured result values
+- Additional high-level processing details, such as repository inclusion/exclusion counts
+
+Repeat the flag (`--verbose --verbose`) to enable **trace-level** output, which additionally includes:
+
+- Raw git command output (stdout/stderr from every git invocation, when non-empty)
+- Full GitHub API response bodies
+
+Authentication secrets are never printed in verbose or trace output. Authorization tokens are not logged, and sensitive URL query parameters are redacted.
 
 ### Color Control
 

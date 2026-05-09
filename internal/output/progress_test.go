@@ -7,7 +7,7 @@ import (
 )
 
 func newTestPrinter() *Printer {
-	return &Printer{color: false, verbose: false, interactive: false}
+	return &Printer{color: false, verbosity: 0, interactive: false}
 }
 
 func TestDigitCount(t *testing.T) {

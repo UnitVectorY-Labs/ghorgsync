@@ -24,11 +24,23 @@ type GitRunner interface {
 }
 
 // ExecGitRunner runs real git commands.
-type ExecGitRunner struct{}
+// When tracef is set, the raw output of each command is forwarded to it.
+type ExecGitRunner struct {
+	tracef func(string, ...interface{})
+}
+
+func (g *ExecGitRunner) tracefSafe(format string, args ...interface{}) {
+	if g.tracef != nil {
+		g.tracef(format, args...)
+	}
+}
 
 func (g *ExecGitRunner) Clone(url, dest string) error {
 	cmd := exec.Command("git", "clone", "--recurse-submodules", url, dest)
 	out, err := cmd.CombinedOutput()
+	if s := strings.TrimSpace(string(out)); s != "" {
+		g.tracefSafe("git output:\n%s", s)
+	}
 	if err != nil {
 		return fmt.Errorf("git clone: %s: %w", strings.TrimSpace(string(out)), err)
 	}
@@ -38,6 +50,9 @@ func (g *ExecGitRunner) Clone(url, dest string) error {
 func (g *ExecGitRunner) Fetch(repoDir string) error {
 	cmd := exec.Command("git", "-C", repoDir, "fetch", "--all", "--prune")
 	out, err := cmd.CombinedOutput()
+	if s := strings.TrimSpace(string(out)); s != "" {
+		g.tracefSafe("git output:\n%s", s)
+	}
 	if err != nil {
 		return fmt.Errorf("git fetch: %s: %w", strings.TrimSpace(string(out)), err)
 	}
@@ -47,6 +62,9 @@ func (g *ExecGitRunner) Fetch(repoDir string) error {
 func (g *ExecGitRunner) SubmoduleUpdate(repoDir string) error {
 	cmd := exec.Command("git", "-C", repoDir, "submodule", "update", "--init", "--recursive")
 	out, err := cmd.CombinedOutput()
+	if s := strings.TrimSpace(string(out)); s != "" {
+		g.tracefSafe("git output:\n%s", s)
+	}
 	if err != nil {
 		return fmt.Errorf("git submodule update: %s: %w", strings.TrimSpace(string(out)), err)
 	}
@@ -59,7 +77,9 @@ func (g *ExecGitRunner) CurrentBranch(repoDir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("git current branch: %w", err)
 	}
-	return strings.TrimSpace(string(out)), nil
+	branch := strings.TrimSpace(string(out))
+	g.tracefSafe("git output: %s", branch)
+	return branch, nil
 }
 
 func (g *ExecGitRunner) IsDirty(repoDir string) (bool, []model.DirtyFile, error) {
@@ -68,6 +88,9 @@ func (g *ExecGitRunner) IsDirty(repoDir string) (bool, []model.DirtyFile, error)
 	out, err := cmd.Output()
 	if err != nil {
 		return false, nil, fmt.Errorf("git status: %w", err)
+	}
+	if s := strings.TrimSpace(string(out)); s != "" {
+		g.tracefSafe("git output:\n%s", s)
 	}
 	files := ParseGitStatus(string(out))
 	if len(files) == 0 {
@@ -83,6 +106,9 @@ func (g *ExecGitRunner) DiffStats(repoDir string) (int, int, error) {
 	if err != nil {
 		return 0, 0, nil // non-fatal
 	}
+	if s := strings.TrimSpace(string(out)); s != "" {
+		g.tracefSafe("git output:\n%s", s)
+	}
 	adds, dels := parseNumstat(string(out))
 
 	// Unstaged changes
@@ -90,6 +116,9 @@ func (g *ExecGitRunner) DiffStats(repoDir string) (int, int, error) {
 	out2, err := cmd2.Output()
 	if err != nil {
 		return adds, dels, nil
+	}
+	if s := strings.TrimSpace(string(out2)); s != "" {
+		g.tracefSafe("git output:\n%s", s)
 	}
 	a2, d2 := parseNumstat(string(out2))
 	return adds + a2, dels + d2, nil
@@ -123,6 +152,9 @@ func parseNumstat(output string) (int, int) {
 func (g *ExecGitRunner) Checkout(repoDir, branch string) error {
 	cmd := exec.Command("git", "-C", repoDir, "checkout", branch)
 	out, err := cmd.CombinedOutput()
+	if s := strings.TrimSpace(string(out)); s != "" {
+		g.tracefSafe("git output:\n%s", s)
+	}
 	if err != nil {
 		return fmt.Errorf("git checkout %s: %s: %w", branch, strings.TrimSpace(string(out)), err)
 	}
@@ -135,6 +167,9 @@ func (g *ExecGitRunner) PullFF(repoDir string) (bool, error) {
 
 	cmd := exec.Command("git", "-C", repoDir, "pull", "--ff-only")
 	out, err := cmd.CombinedOutput()
+	if s := strings.TrimSpace(string(out)); s != "" {
+		g.tracefSafe("git output:\n%s", s)
+	}
 	if err != nil {
 		return false, fmt.Errorf("git pull --ff-only: %s: %w", strings.TrimSpace(string(out)), err)
 	}
@@ -155,7 +190,9 @@ func (g *ExecGitRunner) RemoteURL(repoDir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("git remote get-url: %w", err)
 	}
-	return strings.TrimSpace(string(out)), nil
+	remote := strings.TrimSpace(string(out))
+	g.tracefSafe("git output: %s", remote)
+	return remote, nil
 }
 
 func (g *ExecGitRunner) StatusShort(repoDir string) (string, error) {
@@ -163,6 +200,9 @@ func (g *ExecGitRunner) StatusShort(repoDir string) (string, error) {
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("git status: %w", err)
+	}
+	if s := strings.TrimSpace(string(out)); s != "" {
+		g.tracefSafe("git output:\n%s", s)
 	}
 	return string(out), nil
 }
