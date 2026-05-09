@@ -30,6 +30,7 @@ permalink: /usage
 | `include_private` | boolean | `true` | Include private repositories |
 | `include_archived` | boolean | `false` | Include archived repositories |
 | `exclude_repos` | array | `[]` | Repository names or regex patterns to exclude |
+| `branch_hint` | object | — | Optionally read a repo-specific default branch from a file before falling back to GitHub metadata |
 
 {: .highlight }
 Exactly one of `organization` or `user` must be specified. They cannot both be set.
@@ -47,11 +48,30 @@ exclude_repos:
 
 Invalid regex patterns produce a clear configuration error that identifies the offending pattern.
 
+### Branch Hint
+
+Use `branch_hint` when repositories carry their own default-branch signal in a tracked JSON or YAML file and you want **ghorgsync** to consult that file before using GitHub metadata.
+
+```yaml
+branch_hint:
+  path: .repo-metadata.yaml
+  type: yaml
+  json_path: defaults.branch
+```
+
+- `path` points to the file inside each repository.
+- `type` declares how that file should be parsed (`json` or `yaml`).
+- `json_path` identifies the branch value to read from the parsed document.
+
+If the file is missing, unreadable, blank at the configured path, or otherwise unusable, **ghorgsync** silently falls back to the default branch reported by GitHub. This keeps the feature safe as a hint rather than a hard requirement.
+
 ### Configuration Validation
 
 - Exactly one of `organization` or `user` is required; the command exits with an error if both are set, or neither is set.
 - Setting both `include_public` and `include_private` to `false` is invalid.
 - Invalid YAML produces a clear error message.
+- When `branch_hint` is configured, `branch_hint.path`, `branch_hint.type`, and `branch_hint.json_path` are all required.
+- `branch_hint.type` must be `json` or `yaml`.
 
 ## Command-Line Flags
 
@@ -84,11 +104,11 @@ When invoked, **ghorgsync** performs the following steps:
 
 1. **Load configuration** from `.ghorgsync` and validate it.
 2. **Resolve authentication** and connect to the GitHub API. See [Installation](INSTALL.md#prerequisites) for configuring authentication.
-3. **Fetch the repository list** from the GitHub organization or user account, including default branch metadata.
+3. **Fetch the repository list** from the GitHub organization or user account, including GitHub's default branch metadata for fallback.
 4. **Filter repositories** by visibility (`include_public`/`include_private`), archived status (`include_archived`), and exclusion patterns.
 5. **Scan the local directory** and classify child entries (see [Local Directory Classification](#local-directory-classification)).
 6. **Clone missing repositories**.
-7. **Process existing repositories** (fetch, audit, conditionally checkout and pull).
+7. **Process existing repositories** (fetch, audit, optionally resolve a local branch hint, conditionally checkout and pull).
 8. **Report findings** (collisions, unknown folders, excluded-but-present).
 9. **Print a summary line** with counts.
 
@@ -235,7 +255,7 @@ GitHub repositories can be archived, making them read-only. **ghorgsync** treats
 
 ## Branch Drift
 
-A repository is in *branch drift* when its current branch differs from the default branch (as defined by GitHub metadata). Default branch names are per-repository and are never assumed.
+A repository is in *branch drift* when its current branch differs from the default branch. When `branch_hint` is configured, **ghorgsync** checks the hinted file first and falls back to GitHub metadata when needed. Default branch names are per-repository and are never assumed.
 
 - **Dirty repo with drift:** reported as informational; no automatic correction since checkout is unsafe.
 - **Clean repo with drift:** the default branch is checked out and pulled; the correction is logged.

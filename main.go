@@ -108,7 +108,7 @@ func main() {
 	}
 
 	// Create sync engine
-	eng := sync.NewEngine(dir, *verboseFlag)
+	eng := sync.NewEngine(dir, *verboseFlag, cfg.BranchHint)
 
 	// Build lookup map from repo name → RepoInfo
 	repoMap := make(map[string]model.RepoInfo, len(included))

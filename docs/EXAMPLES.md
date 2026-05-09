@@ -81,6 +81,45 @@ include_archived: true
 
 With this setting, archived repositories are cloned and synced like any other repository. Without it (the default), archived repositories are skipped and any existing local directories for them are reported as `excluded-but-present`.
 
+### Hinting the Default Branch from a Repository File
+
+Use `branch_hint` when a repository already records its preferred default branch in a tracked file and you want **ghorgsync** to honor that value before consulting GitHub metadata.
+
+```yaml
+organization: my-org
+branch_hint:
+  path: .repo-metadata.yaml
+  type: yaml
+  json_path: defaults.branch
+```
+
+Example repository file:
+
+```yaml
+defaults:
+  branch: release
+```
+
+This is especially helpful when a repository keeps rollout or platform metadata in source control and that metadata should drive branch drift checks locally. If the hint file is absent or the configured value is empty, **ghorgsync** quietly falls back to GitHub's default branch for that repository.
+
+The same idea works with JSON:
+
+```yaml
+user: my-username
+branch_hint:
+  path: repo.json
+  type: json
+  json_path: repository.default_branch
+```
+
+```json
+{
+  "repository": {
+    "default_branch": "main"
+  }
+}
+```
+
 ## Example Output
 
 The examples below show the stable log lines and summary output. In an interactive terminal (TTY), **ghorgsync** also renders a live progress bar during repository processing. The progress bar uses smooth Unicode block characters and scales to the terminal width:

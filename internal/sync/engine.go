@@ -3,22 +3,25 @@ package sync
 import (
 	"path/filepath"
 
+	"github.com/UnitVectorY-Labs/ghorgsync/internal/config"
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/model"
 )
 
 // Engine orchestrates per-repo sync operations.
 type Engine struct {
-	Git     GitRunner
-	BaseDir string
-	Verbose bool
+	Git        GitRunner
+	BaseDir    string
+	Verbose    bool
+	BranchHint *config.BranchHint
 }
 
 // NewEngine creates a new sync engine.
-func NewEngine(baseDir string, verbose bool) *Engine {
+func NewEngine(baseDir string, verbose bool, branchHint *config.BranchHint) *Engine {
 	return &Engine{
-		Git:     &ExecGitRunner{},
-		BaseDir: baseDir,
-		Verbose: verbose,
+		Git:        &ExecGitRunner{},
+		BaseDir:    baseDir,
+		Verbose:    verbose,
+		BranchHint: branchHint,
 	}
 }
 
@@ -44,9 +47,10 @@ func (e *Engine) CloneRepo(repo model.RepoInfo) model.RepoResult {
 // ProcessRepo audits and syncs an existing local repository.
 func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 	repoDir := filepath.Join(e.BaseDir, repo.Name)
+	defaultBranch := e.resolveDefaultBranch(repo, repoDir)
 	result := model.RepoResult{
 		Name:          repo.Name,
-		DefaultBranch: repo.DefaultBranch,
+		DefaultBranch: defaultBranch,
 	}
 
 	// Always fetch (safe operation)
@@ -72,7 +76,7 @@ func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 		return result
 	}
 	result.CurrentBranch = branch
-	result.BranchDrift = branch != repo.DefaultBranch
+	result.BranchDrift = branch != defaultBranch
 
 	// Check dirty state
 	dirty, files, err := e.Git.IsDirty(repoDir)
@@ -94,12 +98,12 @@ func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 
 	// Clean repo: checkout default branch if needed, then pull
 	if result.BranchDrift {
-		if err := e.Git.Checkout(repoDir, repo.DefaultBranch); err != nil {
+		if err := e.Git.Checkout(repoDir, defaultBranch); err != nil {
 			result.Action = model.ActionCheckoutError
 			result.Error = err
 			return result
 		}
-		result.CurrentBranch = repo.DefaultBranch
+		result.CurrentBranch = defaultBranch
 	}
 
 	// Pull with ff-only
@@ -140,9 +144,10 @@ func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 // if the repo is clean and on the default branch.
 func (e *Engine) StatusRepo(repo model.RepoInfo) model.RepoResult {
 	repoDir := filepath.Join(e.BaseDir, repo.Name)
+	defaultBranch := e.resolveDefaultBranch(repo, repoDir)
 	result := model.RepoResult{
 		Name:          repo.Name,
-		DefaultBranch: repo.DefaultBranch,
+		DefaultBranch: defaultBranch,
 	}
 
 	// Get current branch
@@ -153,7 +158,7 @@ func (e *Engine) StatusRepo(repo model.RepoInfo) model.RepoResult {
 		return result
 	}
 	result.CurrentBranch = branch
-	result.BranchDrift = branch != repo.DefaultBranch
+	result.BranchDrift = branch != defaultBranch
 
 	// Check dirty state
 	dirty, files, err := e.Git.IsDirty(repoDir)
@@ -180,4 +185,12 @@ func (e *Engine) StatusRepo(repo model.RepoInfo) model.RepoResult {
 
 	result.Action = model.ActionAlreadyCurrent
 	return result
+}
+
+func (e *Engine) resolveDefaultBranch(repo model.RepoInfo, repoDir string) string {
+	if branch := config.ResolveBranchHint(repoDir, e.BranchHint); branch != "" {
+		return branch
+	}
+
+	return repo.DefaultBranch
 }
