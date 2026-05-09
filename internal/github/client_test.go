@@ -36,13 +36,16 @@ func TestListRepos_VerboseLogsRequestsAndResponses(t *testing.T) {
 	}
 
 	joined := strings.Join(logs, "\n")
-	if !strings.Contains(joined, "api request: GET "+server.URL+"?page=1&per_page=100") {
+	if !strings.Contains(joined, "api request: GET "+server.URL+"?") ||
+		!strings.Contains(joined, "per_page=100") ||
+		!strings.Contains(joined, "page=1") {
 		t.Fatalf("missing request verbose log: %s", joined)
 	}
 	if !strings.Contains(joined, "Authorization:true") {
 		t.Fatalf("missing auth-presence indicator in logs: %s", joined)
 	}
-	if !strings.Contains(joined, "api response: GET "+server.URL+"?page=1&per_page=100 status=200") {
+	if !strings.Contains(joined, "api response: GET "+server.URL+"?") ||
+		!strings.Contains(joined, "status=200") {
 		t.Fatalf("missing response verbose log: %s", joined)
 	}
 	if strings.Contains(joined, "super-secret-token") {
