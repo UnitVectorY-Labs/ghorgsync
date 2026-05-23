@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"runtime/debug"
 	"strings"
 
@@ -17,6 +18,17 @@ import (
 )
 
 var Version = "dev" // This will be set by the build systems to the release version
+
+func normalizedVersion(version string) string {
+	if version == "dev" || version == "" || strings.HasPrefix(version, "v") {
+		return version
+	}
+	return "v" + version
+}
+
+func versionString(version string) string {
+	return fmt.Sprintf("ghorgsync version %s (%s, %s/%s)", normalizedVersion(version), runtime.Version(), runtime.GOOS, runtime.GOARCH)
+}
 
 // countFlag is a flag.Value that counts how many times --verbose is repeated.
 // Implements IsBoolFlag so it can be used without an explicit value (--verbose).
@@ -60,7 +72,7 @@ func main() {
 	}
 
 	if *versionFlag {
-		fmt.Printf("ghorgsync version %s\n", Version)
+		fmt.Println(versionString(Version))
 		os.Exit(0)
 	}
 
