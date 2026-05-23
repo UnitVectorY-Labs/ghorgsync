@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"runtime/debug"
 	"strings"
@@ -19,11 +20,13 @@ import (
 
 var Version = "dev" // This will be set by the build systems to the release version
 
+var semverRe = regexp.MustCompile(`^\d+\.\d+\.\d+`)
+
 func normalizedVersion(version string) string {
-	if version == "dev" || version == "" || strings.HasPrefix(version, "v") {
-		return version
+	if semverRe.MatchString(version) && !strings.HasPrefix(version, "v") {
+		return "v" + version
 	}
-	return "v" + version
+	return version
 }
 
 func versionString(version string) string {
