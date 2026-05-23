@@ -62,7 +62,7 @@ ghorgsync [flags]
 | Flag | Description |
 |---|---|
 | `--help` | Print usage information and exit |
-| `--version` | Print version and exit |
+| `--version` | Print version/build info and exit (format: `ghorgsync version vX.Y.Z (goX.Y, os/arch)`) |
 | `--verbose` | Enable verbose diagnostics output (GitHub API requests/responses and local git commands/results; sensitive auth values are redacted). Repeat the flag (`--verbose --verbose`) to enable trace-level output that additionally includes raw git command output and API response bodies. |
 | `--no-color` | Disable color output |
 | `--clone` | Clone-only mode: only clone missing repositories (see [Clone-Only Mode](#clone-only-mode)) |
