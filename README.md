@@ -2,7 +2,7 @@
 
 # ghorgsync
 
-Clone and update all organization or user account repositories in one folder, with clean-state and branch audits plus warnings for stray content.
+Clone and update all organization repositories in one folder, with clean-state and branch audits plus warnings for stray content.
 
 ## Why ghorgsync?
 
