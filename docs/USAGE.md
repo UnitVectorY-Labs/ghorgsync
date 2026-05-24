@@ -65,6 +65,7 @@ ghorgsync [flags]
 | `--version` | Print version/build info and exit (format: `ghorgsync version vX.Y.Z (goX.Y, os/arch)`) |
 | `--verbose` | Enable verbose diagnostics output (GitHub API requests/responses and local git commands/results; sensitive auth values are redacted). Repeat the flag (`--verbose --verbose`) to enable trace-level output that additionally includes raw git command output and API response bodies. |
 | `--no-color` | Disable color output |
+| `--no-progress` | Suppress the live progress bar. Action and finding output is still printed; only the re-drawn `%` progress lines are omitted. Useful for scripting, CI pipelines, and when the tool's output is consumed by another program or redirected to a file. |
 | `--clone` | Clone-only mode: only clone missing repositories (see [Clone-Only Mode](#clone-only-mode)) |
 | `--status` | Status mode: show only dirty repos and branch drift (see [Status Mode](#status-mode)) |
 
@@ -187,6 +188,8 @@ By default, **ghorgsync** only prints:
 Repositories that are already up to date with no notable events produce no output.
 
 When stdout is a TTY, a live progress bar is shown during repository processing. The progress bar uses the `repo` label with a padded counter, a smooth Unicode block bar that spans the terminal width, and a percentage indicator. If an action or finding needs to be logged, the progress line is temporarily cleared, the log message is printed, and the progress bar is redrawn beneath it so the progress indicator remains at the bottom of the active output.
+
+The live progress bar can be suppressed with `--no-progress` without affecting any other output. This is useful when stdout is a TTY but the output is being captured by a script, CI pipeline, or another program that does not need the re-drawn percentage lines.
 
 ### Verbose Mode
 

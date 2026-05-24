@@ -69,17 +69,20 @@ type Printer struct {
 	color        bool
 	verbosity    int // 0=quiet, 1=verbose, 2=trace
 	interactive  bool
+	noProgress   bool
 	repoProgress repoProgressState
 }
 
 // NewPrinter creates a new Printer.
 // color: whether to enable ANSI color output
 // verbosity: 0=quiet, 1=verbose, 2=trace
-func NewPrinter(color bool, verbosity int) *Printer {
+// noProgress: when true, suppress the live progress bar even on a TTY
+func NewPrinter(color bool, verbosity int, noProgress bool) *Printer {
 	return &Printer{
 		color:       color,
 		verbosity:   verbosity,
 		interactive: IsTerminalOutput(),
+		noProgress:  noProgress,
 	}
 }
 
@@ -228,7 +231,7 @@ func (p *Printer) StartRepoProgress(total int) {
 	}
 	p.repoProgress = repoProgressState{
 		active:     true,
-		live:       p.interactive,
+		live:       p.interactive && !p.noProgress,
 		total:      total,
 		current:    0,
 		totalWidth: digitCount(total),
