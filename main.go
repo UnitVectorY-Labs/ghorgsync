@@ -64,6 +64,7 @@ func main() {
 	var verbosity countFlag
 	flag.Var(&verbosity, "verbose", "Enable verbose output; repeat (--verbose --verbose) for trace-level detail including raw command output and API response bodies")
 	noColorFlag := flag.Bool("no-color", false, "Disable color output")
+	noProgressFlag := flag.Bool("no-progress", false, "Suppress the live progress bar (useful for scripting, CI, and when output is consumed by another program)")
 	cloneOnlyFlag := flag.Bool("clone", false, "Only clone missing repositories (skip processing existing repos)")
 	statusFlag := flag.Bool("status", false, "Show status of repositories (dirty repos and branch drift only)")
 	flag.Parse()
@@ -80,7 +81,7 @@ func main() {
 	}
 
 	useColor := !*noColorFlag && output.ShouldColor()
-	printer := output.NewPrinter(useColor, int(verbosity))
+	printer := output.NewPrinter(useColor, int(verbosity), *noProgressFlag)
 
 	// Startup gate: check for dotfile
 	exePath, err := os.Executable()
