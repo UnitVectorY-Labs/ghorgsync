@@ -50,7 +50,7 @@ func TestNewLoggingGitRunner_WithNilLoggerReturnsOriginalRunner(t *testing.T) {
 
 func TestLoggingGitRunner_LogsCommandAndExitCode(t *testing.T) {
 	var logs []string
-	runner := NewLoggingGitRunner(&loggingMockGitRunner{}, func(format string, args ...interface{}) {
+	runner := NewLoggingGitRunner(&loggingMockGitRunner{}, func(format string, args ...any) {
 		logs = append(logs, fmt.Sprintf(format, args...))
 	})
 
@@ -74,7 +74,7 @@ func TestLoggingGitRunner_LogsCommandAndExitCode(t *testing.T) {
 
 func TestLoggingGitRunner_LogsErrors(t *testing.T) {
 	var logs []string
-	runner := NewLoggingGitRunner(&loggingMockGitRunner{cloneErr: errors.New("clone failed")}, func(format string, args ...interface{}) {
+	runner := NewLoggingGitRunner(&loggingMockGitRunner{cloneErr: errors.New("clone failed")}, func(format string, args ...any) {
 		logs = append(logs, fmt.Sprintf(format, args...))
 	})
 
@@ -102,7 +102,7 @@ func TestLoggingGitRunner_LogsStructuredResults(t *testing.T) {
 		dirty:         true,
 		dirtyFiles:    []model.DirtyFile{{Path: "main.go", Unstaged: true}},
 		statusShort:   " M main.go\n?? new.txt\n",
-	}, func(format string, args ...interface{}) {
+	}, func(format string, args ...any) {
 		logs = append(logs, fmt.Sprintf(format, args...))
 	})
 
@@ -144,7 +144,7 @@ func TestLoggingGitRunner_LogsStructuredResults(t *testing.T) {
 
 func TestLoggingGitRunner_DiffStatsLogsExitCode(t *testing.T) {
 	var logs []string
-	runner := NewLoggingGitRunner(&loggingMockGitRunner{}, func(format string, args ...interface{}) {
+	runner := NewLoggingGitRunner(&loggingMockGitRunner{}, func(format string, args ...any) {
 		logs = append(logs, fmt.Sprintf(format, args...))
 	})
 
@@ -170,7 +170,7 @@ func TestLoggingGitRunner_DiffStatsLogsExitCode(t *testing.T) {
 
 func TestNewEngine_VerbosityZeroNoLogging(t *testing.T) {
 	var logs []string
-	logf := func(format string, args ...interface{}) {
+	logf := func(format string, args ...any) {
 		logs = append(logs, fmt.Sprintf(format, args...))
 	}
 	eng := NewEngine("/tmp", 0, logf, logf)
@@ -182,7 +182,7 @@ func TestNewEngine_VerbosityZeroNoLogging(t *testing.T) {
 }
 
 func TestNewEngine_VerbosityOneWrapsWithLogging(t *testing.T) {
-	logf := func(format string, args ...interface{}) {}
+	logf := func(format string, args ...any) {}
 	eng := NewEngine("/tmp", 1, logf, nil)
 	if _, ok := eng.Git.(*LoggingGitRunner); !ok {
 		t.Fatal("expected LoggingGitRunner at verbosity 1")

@@ -20,7 +20,7 @@ func TestListRepos_VerboseLogsRequestsAndResponses(t *testing.T) {
 
 	var logs []string
 	client := NewClient("super-secret-token",
-		func(format string, args ...interface{}) {
+		func(format string, args ...any) {
 			logs = append(logs, fmt.Sprintf(format, args...))
 		},
 		nil, // no trace logger for this test
@@ -66,8 +66,8 @@ func TestListRepos_TraceLogsResponseBody(t *testing.T) {
 
 	var traceLogs []string
 	client := NewClient("token",
-		func(format string, args ...interface{}) {}, // level-1 logger (discarded)
-		func(format string, args ...interface{}) {
+		func(format string, args ...any) {}, // level-1 logger (discarded)
+		func(format string, args ...any) {
 			traceLogs = append(traceLogs, fmt.Sprintf(format, args...))
 		},
 	)
@@ -100,7 +100,7 @@ func TestListRepos_NoTraceLogger_BodyNotLogged(t *testing.T) {
 	var logs []string
 	// Pass nil tracef — body must not appear in level-1 logs
 	client := NewClient("token",
-		func(format string, args ...interface{}) {
+		func(format string, args ...any) {
 			logs = append(logs, fmt.Sprintf(format, args...))
 		},
 		nil,

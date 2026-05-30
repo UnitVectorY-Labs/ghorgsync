@@ -7,7 +7,8 @@ import (
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/model"
 )
 
-func boolPtr(b bool) *bool { return &b }
+//go:fix inline
+func boolPtr(b bool) *bool { return new(b) }
 
 func sampleRepos() []model.RepoInfo {
 	return []model.RepoInfo{
@@ -41,8 +42,8 @@ func TestFilterRepos_DefaultConfig(t *testing.T) {
 func TestFilterRepos_ExcludePublic(t *testing.T) {
 	cfg := &config.Config{
 		Organization:   "org",
-		IncludePublic:  boolPtr(false),
-		IncludePrivate: boolPtr(true),
+		IncludePublic:  new(false),
+		IncludePrivate: new(true),
 	}
 	included, _ := FilterRepos(sampleRepos(), cfg)
 	for _, r := range included {
@@ -58,8 +59,8 @@ func TestFilterRepos_ExcludePublic(t *testing.T) {
 func TestFilterRepos_ExcludePrivate(t *testing.T) {
 	cfg := &config.Config{
 		Organization:   "org",
-		IncludePublic:  boolPtr(true),
-		IncludePrivate: boolPtr(false),
+		IncludePublic:  new(true),
+		IncludePrivate: new(false),
 	}
 	included, _ := FilterRepos(sampleRepos(), cfg)
 	for _, r := range included {
@@ -121,37 +122,37 @@ func TestFilterRepos_ExcludedListTracked(t *testing.T) {
 }
 
 func TestFilterRepos_ArchivedExcludedByDefault(t *testing.T) {
-cfg := &config.Config{Organization: "org"}
-included, excluded := FilterRepos(sampleReposWithArchived(), cfg)
-if len(included) != 2 {
-t.Errorf("expected 2 included repos (non-archived), got %d", len(included))
-}
-if len(excluded) != 2 {
-t.Errorf("expected 2 excluded repos (archived), got %d", len(excluded))
-}
-for _, r := range included {
-if r.IsArchived {
-t.Errorf("archived repo %q should have been filtered out", r.Name)
-}
-}
-expectedExcluded := map[string]bool{"archived-public": true, "archived-private": true}
-for _, name := range excluded {
-if !expectedExcluded[name] {
-t.Errorf("unexpected excluded repo: %q", name)
-}
-}
+	cfg := &config.Config{Organization: "org"}
+	included, excluded := FilterRepos(sampleReposWithArchived(), cfg)
+	if len(included) != 2 {
+		t.Errorf("expected 2 included repos (non-archived), got %d", len(included))
+	}
+	if len(excluded) != 2 {
+		t.Errorf("expected 2 excluded repos (archived), got %d", len(excluded))
+	}
+	for _, r := range included {
+		if r.IsArchived {
+			t.Errorf("archived repo %q should have been filtered out", r.Name)
+		}
+	}
+	expectedExcluded := map[string]bool{"archived-public": true, "archived-private": true}
+	for _, name := range excluded {
+		if !expectedExcluded[name] {
+			t.Errorf("unexpected excluded repo: %q", name)
+		}
+	}
 }
 
 func TestFilterRepos_ArchivedIncludedWhenConfigured(t *testing.T) {
-cfg := &config.Config{
-Organization:    "org",
-IncludeArchived: boolPtr(true),
-}
-included, excluded := FilterRepos(sampleReposWithArchived(), cfg)
-if len(included) != 4 {
-t.Errorf("expected 4 included repos (including archived), got %d", len(included))
-}
-if len(excluded) != 0 {
-t.Errorf("expected 0 excluded repos, got %d", len(excluded))
-}
+	cfg := &config.Config{
+		Organization:    "org",
+		IncludeArchived: new(true),
+	}
+	included, excluded := FilterRepos(sampleReposWithArchived(), cfg)
+	if len(included) != 4 {
+		t.Errorf("expected 4 included repos (including archived), got %d", len(included))
+	}
+	if len(excluded) != 0 {
+		t.Errorf("expected 0 excluded repos, got %d", len(excluded))
+	}
 }

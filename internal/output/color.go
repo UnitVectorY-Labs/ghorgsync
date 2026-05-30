@@ -170,10 +170,7 @@ func (p *Printer) renderProgressLine(termWidth int) string {
 	counterWidth := tw + 1 + digitCount(total)
 	fixedWidth := 2 + 4 + 2 + counterWidth + 1 + 1 + 1 + 1 + 4
 
-	barWidth := termWidth - fixedWidth
-	if barWidth < minBarWidth {
-		barWidth = minBarWidth
-	}
+	barWidth := max(termWidth-fixedWidth, minBarWidth)
 
 	// Compute filled portion using eighths for smooth partial steps.
 	filledEighths := 0
@@ -277,7 +274,7 @@ func (p *Printer) Header(text string) {
 }
 
 // Verbose prints a message only in verbose mode (verbosity >= 1).
-func (p *Printer) Verbose(format string, args ...interface{}) {
+func (p *Printer) Verbose(format string, args ...any) {
 	if p.verbosity < 1 {
 		return
 	}
@@ -289,13 +286,13 @@ func (p *Printer) Verbose(format string, args ...interface{}) {
 
 // Trace prints a message only in trace mode (verbosity >= 2).
 // Multi-line messages are indented line-by-line.
-func (p *Printer) Trace(format string, args ...interface{}) {
+func (p *Printer) Trace(format string, args ...any) {
 	if p.verbosity < 2 {
 		return
 	}
 	msg := fmt.Sprintf(format, args...)
 	p.withProgressSuspended(func() {
-		for _, line := range strings.Split(strings.TrimRight(msg, "\n"), "\n") {
+		for line := range strings.SplitSeq(strings.TrimRight(msg, "\n"), "\n") {
 			fmt.Println(p.colorize(gray, "  "+line))
 		}
 	})
@@ -438,7 +435,7 @@ func (p *Printer) RepoStatusDirty(name, currentBranch, defaultBranch, statusOutp
 			p.colorize(yellow, "[dirty]"),
 			branchInfo)
 		// Print colorized git status output (already includes ANSI codes from git)
-		for _, line := range strings.Split(strings.TrimRight(statusOutput, "\n"), "\n") {
+		for line := range strings.SplitSeq(strings.TrimRight(statusOutput, "\n"), "\n") {
 			if line != "" {
 				fmt.Printf("       %s\n", line)
 			}

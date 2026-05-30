@@ -19,14 +19,14 @@ import (
 type Client struct {
 	token      string
 	httpClient *http.Client
-	verbosef   func(string, ...interface{})
-	tracef     func(string, ...interface{})
+	verbosef   func(string, ...any)
+	tracef     func(string, ...any)
 }
 
 // NewClient creates a new GitHub API client.
 // It resolves a token from GITHUB_TOKEN, GH_TOKEN env vars, or gh CLI auth.
 // logf is called for verbose (level-1) messages; tracef for trace (level-2) messages.
-func NewClient(token string, logf func(string, ...interface{}), tracef func(string, ...interface{})) *Client {
+func NewClient(token string, logf func(string, ...any), tracef func(string, ...any)) *Client {
 	return &Client{
 		token: token,
 		httpClient: &http.Client{
@@ -125,14 +125,14 @@ func (c *Client) listRepos(url string) ([]model.RepoInfo, error) {
 	return repos, nil
 }
 
-func (c *Client) verbosefSafe(format string, args ...interface{}) {
+func (c *Client) verbosefSafe(format string, args ...any) {
 	if c.verbosef == nil {
 		return
 	}
 	c.verbosef(format, args...)
 }
 
-func (c *Client) tracefSafe(format string, args ...interface{}) {
+func (c *Client) tracefSafe(format string, args ...any) {
 	if c.tracef == nil {
 		return
 	}
@@ -179,7 +179,7 @@ func nextLink(header string) string {
 	if header == "" {
 		return ""
 	}
-	for _, part := range strings.Split(header, ",") {
+	for part := range strings.SplitSeq(header, ",") {
 		part = strings.TrimSpace(part)
 		if strings.Contains(part, `rel="next"`) {
 			// Extract URL between < and >
