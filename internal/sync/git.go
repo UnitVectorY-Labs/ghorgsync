@@ -26,10 +26,10 @@ type GitRunner interface {
 // ExecGitRunner runs real git commands.
 // When tracef is set, the raw output of each command is forwarded to it.
 type ExecGitRunner struct {
-	tracef func(string, ...interface{})
+	tracef func(string, ...any)
 }
 
-func (g *ExecGitRunner) tracefSafe(format string, args ...interface{}) {
+func (g *ExecGitRunner) tracefSafe(format string, args ...any) {
 	if g.tracef != nil {
 		g.tracef(format, args...)
 	}
@@ -126,7 +126,7 @@ func (g *ExecGitRunner) DiffStats(repoDir string) (int, int, error) {
 
 func parseNumstat(output string) (int, int) {
 	var adds, dels int
-	for _, line := range strings.Split(strings.TrimSpace(output), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(output), "\n") {
 		if line == "" {
 			continue
 		}

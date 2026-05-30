@@ -12,12 +12,12 @@ import (
 // along with any structured result values.
 type LoggingGitRunner struct {
 	next GitRunner
-	logf func(string, ...interface{})
+	logf func(string, ...any)
 }
 
 // NewLoggingGitRunner wraps a GitRunner and emits command diagnostics via logf.
 // If logf is nil the original runner is returned unwrapped.
-func NewLoggingGitRunner(next GitRunner, logf func(string, ...interface{})) GitRunner {
+func NewLoggingGitRunner(next GitRunner, logf func(string, ...any)) GitRunner {
 	if logf == nil {
 		return next
 	}

@@ -6,8 +6,9 @@ import (
 	"testing"
 )
 
+//go:fix inline
 func boolPtr(b bool) *bool {
-	return &b
+	return new(b)
 }
 
 func writeTestConfig(t *testing.T, content string) string {
@@ -77,8 +78,8 @@ func TestValidateMissingOrganization(t *testing.T) {
 func TestValidateBothIncludesFalse(t *testing.T) {
 	cfg := &Config{
 		Organization:   "my-org",
-		IncludePublic:  boolPtr(false),
-		IncludePrivate: boolPtr(false),
+		IncludePublic:  new(false),
+		IncludePrivate: new(false),
 	}
 	err := cfg.Validate()
 	if err == nil {
@@ -148,30 +149,30 @@ func TestIsExcludedNonMatching(t *testing.T) {
 }
 
 func TestShouldIncludeArchivedDefault(t *testing.T) {
-cfg := &Config{Organization: "my-org"}
-if cfg.ShouldIncludeArchived() {
-t.Error("ShouldIncludeArchived() = true, want false (default)")
-}
+	cfg := &Config{Organization: "my-org"}
+	if cfg.ShouldIncludeArchived() {
+		t.Error("ShouldIncludeArchived() = true, want false (default)")
+	}
 }
 
 func TestShouldIncludeArchivedExplicitTrue(t *testing.T) {
-cfg := &Config{
-Organization:    "my-org",
-IncludeArchived: boolPtr(true),
-}
-if !cfg.ShouldIncludeArchived() {
-t.Error("ShouldIncludeArchived() = false, want true when explicitly set")
-}
+	cfg := &Config{
+		Organization:    "my-org",
+		IncludeArchived: new(true),
+	}
+	if !cfg.ShouldIncludeArchived() {
+		t.Error("ShouldIncludeArchived() = false, want true when explicitly set")
+	}
 }
 
 func TestShouldIncludeArchivedExplicitFalse(t *testing.T) {
-cfg := &Config{
-Organization:    "my-org",
-IncludeArchived: boolPtr(false),
-}
-if cfg.ShouldIncludeArchived() {
-t.Error("ShouldIncludeArchived() = true, want false when explicitly set to false")
-}
+	cfg := &Config{
+		Organization:    "my-org",
+		IncludeArchived: new(false),
+	}
+	if cfg.ShouldIncludeArchived() {
+		t.Error("ShouldIncludeArchived() = true, want false when explicitly set to false")
+	}
 }
 
 func TestValidateUserConfig(t *testing.T) {
@@ -242,19 +243,19 @@ include_private: false
 }
 
 func TestLoadConfigWithIncludeArchived(t *testing.T) {
-yaml := `
+	yaml := `
 organization: my-org
 include_archived: true
 `
-path := writeTestConfig(t, yaml)
-cfg, err := Load(path)
-if err != nil {
-t.Fatalf("unexpected error: %v", err)
-}
-if cfg.IncludeArchived == nil || !*cfg.IncludeArchived {
-t.Errorf("IncludeArchived = %v, want true", cfg.IncludeArchived)
-}
-if !cfg.ShouldIncludeArchived() {
-t.Error("ShouldIncludeArchived() = false, want true")
-}
+	path := writeTestConfig(t, yaml)
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.IncludeArchived == nil || !*cfg.IncludeArchived {
+		t.Errorf("IncludeArchived = %v, want true", cfg.IncludeArchived)
+	}
+	if !cfg.ShouldIncludeArchived() {
+		t.Error("ShouldIncludeArchived() = false, want true")
+	}
 }

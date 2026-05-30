@@ -15,7 +15,7 @@ type Engine struct {
 
 // NewEngine creates a new sync engine.
 // verbosity controls logging: 0=quiet, 1=verbose (cmd/exit), 2=trace (also raw output).
-func NewEngine(baseDir string, verbosity int, logf func(string, ...interface{}), tracef func(string, ...interface{})) *Engine {
+func NewEngine(baseDir string, verbosity int, logf func(string, ...any), tracef func(string, ...any)) *Engine {
 	var inner GitRunner
 	if verbosity >= 2 && tracef != nil {
 		inner = &ExecGitRunner{tracef: tracef}
