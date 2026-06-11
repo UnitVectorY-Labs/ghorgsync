@@ -122,8 +122,12 @@ func main() {
 		if authUserErr == nil && authUser == cfg.User {
 			allRepos, err = client.ListOwnRepos()
 		} else {
-			if authUserErr == nil && cfg.ShouldIncludePrivate() {
-				printer.Verbose("warning: configured user %q does not match authenticated user %q; private repositories will not be included", cfg.User, authUser)
+			if cfg.ShouldIncludePrivate() {
+				if authUserErr != nil {
+					printer.Verbose("warning: could not verify authenticated user (%v); private repositories may not be included", authUserErr)
+				} else {
+					printer.Verbose("warning: configured user %q does not match authenticated user %q; private repositories will not be included", cfg.User, authUser)
+				}
 			}
 			allRepos, err = client.ListUserRepos(cfg.User)
 		}
