@@ -118,7 +118,19 @@ func main() {
 
 	var allRepos []model.RepoInfo
 	if cfg.IsUserMode() {
-		allRepos, err = client.ListUserRepos(cfg.User)
+		authUser, authUserErr := client.GetAuthenticatedUser()
+		if authUserErr == nil && authUser == cfg.User {
+			allRepos, err = client.ListOwnRepos()
+		} else {
+			if cfg.ShouldIncludePrivate() {
+				if authUserErr != nil {
+					printer.Verbose("warning: could not verify authenticated user (%v); private repositories may not be included", authUserErr)
+				} else {
+					printer.Verbose("warning: configured user %q does not match authenticated user %q; private repositories will not be included", cfg.User, authUser)
+				}
+			}
+			allRepos, err = client.ListUserRepos(cfg.User)
+		}
 	} else {
 		allRepos, err = client.ListOrgRepos(cfg.Organization)
 	}

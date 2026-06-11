@@ -247,6 +247,15 @@ GitHub repositories can be archived, making them read-only. **ghorgsync** treats
 - **Default (`include_archived: false`):** Archived repositories are ignored entirely. They are not cloned and are not synced. If a local directory exists for an archived repository, it is classified as **excluded-but-present** and reported accordingly.
 - **Opt-in (`include_archived: true`):** Archived repositories are treated like any other repository — cloned if missing, and synced (fetch/audit) if present.
 
+## User Mode and Private Repositories
+
+When `user` is set in the configuration, **ghorgsync** automatically detects whether the configured username matches the authenticated token owner:
+
+- **Matching user:** `GET /user/repos` is called, which returns all repositories — public and private — for the authenticated user. This ensures that private repositories are included when `include_private` is `true` (the default).
+- **Different user:** `GET /users/{username}/repos` is called, which returns only public repositories for that user. If `include_private` is `true` (or not explicitly set), a verbose-level warning is emitted to indicate that private repositories cannot be fetched for a third-party user account.
+
+This detection happens at runtime on each invocation using a cached call to `GET /user`.
+
 ## Branch Drift
 
 A repository is in *branch drift* when its current branch differs from the default branch (as defined by GitHub metadata). Default branch names are per-repository and are never assumed.
