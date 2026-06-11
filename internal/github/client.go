@@ -21,6 +21,11 @@ type Client struct {
 	httpClient *http.Client
 	verbosef   func(string, ...any)
 	tracef     func(string, ...any)
+
+	// cached authenticated user (populated lazily by GetAuthenticatedUser)
+	authUserOnce  bool
+	authUserLogin string
+	authUserErr   error
 }
 
 // NewClient creates a new GitHub API client.
@@ -168,10 +173,76 @@ func (c *Client) ListOrgRepos(org string) ([]model.RepoInfo, error) {
 	return c.listRepos(url)
 }
 
-// ListUserRepos lists all repositories for the given user account.
+// ListUserRepos lists all public repositories for the given user account.
+// Use ListOwnRepos to fetch all repositories (including private) for the authenticated user.
 func (c *Client) ListUserRepos(username string) ([]model.RepoInfo, error) {
 	url := fmt.Sprintf("https://api.github.com/users/%s/repos?per_page=100&page=1", username)
 	return c.listRepos(url)
+}
+
+// ghUser is the JSON shape returned by the GitHub /user API.
+type ghUser struct {
+	Login string `json:"login"`
+}
+
+// GetAuthenticatedUser returns the login of the authenticated token owner.
+// The result is cached after the first call.
+func (c *Client) GetAuthenticatedUser() (string, error) {
+	if c.authUserOnce {
+		return c.authUserLogin, c.authUserErr
+	}
+	c.authUserOnce = true
+
+	const apiURL = "https://api.github.com/user"
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		c.authUserErr = fmt.Errorf("creating request: %w", err)
+		return "", c.authUserErr
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	c.verbosefSafe("api request: %s %s headers={Accept:%q Authorization:%t}",
+		req.Method, apiURL, req.Header.Get("Accept"), c.token != "")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		c.authUserErr = fmt.Errorf("requesting user: %w", err)
+		return "", c.authUserErr
+	}
+	c.verbosefSafe("api response: %s %s status=%d", req.Method, apiURL, resp.StatusCode)
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		c.authUserErr = fmt.Errorf("reading response body: %w", err)
+		return "", c.authUserErr
+	}
+	c.tracefSafe("api body: %s", bytes.TrimSpace(bodyBytes))
+
+	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+		c.authUserErr = fmt.Errorf("GitHub API auth error (HTTP %d): check your token", resp.StatusCode)
+		return "", c.authUserErr
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		c.authUserErr = fmt.Errorf("GitHub API error (HTTP %d)", resp.StatusCode)
+		return "", c.authUserErr
+	}
+
+	var u ghUser
+	if err := json.Unmarshal(bodyBytes, &u); err != nil {
+		c.authUserErr = fmt.Errorf("decoding response: %w", err)
+		return "", c.authUserErr
+	}
+
+	c.authUserLogin = u.Login
+	return c.authUserLogin, nil
+}
+
+// ListOwnRepos lists all repositories (public and private) for the authenticated user.
+func (c *Client) ListOwnRepos() ([]model.RepoInfo, error) {
+	return c.listRepos("https://api.github.com/user/repos?per_page=100&page=1")
 }
 
 // nextLink parses the GitHub Link header and returns the URL for rel="next", or "".

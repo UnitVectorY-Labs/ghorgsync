@@ -131,3 +131,112 @@ func TestSanitizeRequestURL_RedactsSensitiveQueryValues(t *testing.T) {
 		t.Fatalf("expected token to be redacted, got: %s", sanitized)
 	}
 }
+
+func TestGetAuthenticatedUser_ReturnsLogin(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/user" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"login":"octocat","id":1}`)
+	}))
+	defer server.Close()
+
+	client := NewClient("test-token", nil, nil)
+	client.httpClient = &http.Client{Transport: rewriteHostTransport{target: server.URL}}
+
+	login, err := client.GetAuthenticatedUser()
+	if err != nil {
+		t.Fatalf("GetAuthenticatedUser returned error: %v", err)
+	}
+	if login != "octocat" {
+		t.Fatalf("expected login %q, got %q", "octocat", login)
+	}
+}
+
+func TestGetAuthenticatedUser_CachesResult(t *testing.T) {
+	callCount := 0
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		callCount++
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `{"login":"octocat"}`)
+	}))
+	defer server.Close()
+
+	client := NewClient("token", nil, nil)
+	client.httpClient = &http.Client{Transport: rewriteHostTransport{target: server.URL}}
+
+	for i := 0; i < 3; i++ {
+		login, err := client.GetAuthenticatedUser()
+		if err != nil {
+			t.Fatalf("call %d: GetAuthenticatedUser returned error: %v", i, err)
+		}
+		if login != "octocat" {
+			t.Fatalf("call %d: expected login %q, got %q", i, "octocat", login)
+		}
+	}
+	if callCount != 1 {
+		t.Fatalf("expected exactly 1 HTTP call, got %d", callCount)
+	}
+}
+
+func TestGetAuthenticatedUser_AuthError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		fmt.Fprintln(w, `{"message":"Bad credentials"}`)
+	}))
+	defer server.Close()
+
+	client := NewClient("bad-token", nil, nil)
+	client.httpClient = &http.Client{Transport: rewriteHostTransport{target: server.URL}}
+
+	_, err := client.GetAuthenticatedUser()
+	if err == nil {
+		t.Fatal("expected error for 401 response, got nil")
+	}
+	if !strings.Contains(err.Error(), "401") {
+		t.Fatalf("expected error to mention 401, got: %v", err)
+	}
+}
+
+func TestListOwnRepos_ReturnsAllRepos(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/user/repos" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `[{"name":"private-repo","clone_url":"https://github.com/octocat/private-repo.git","default_branch":"main","private":true,"archived":false}]`)
+	}))
+	defer server.Close()
+
+	client := NewClient("token", nil, nil)
+	client.httpClient = &http.Client{Transport: rewriteHostTransport{target: server.URL}}
+
+	repos, err := client.ListOwnRepos()
+	if err != nil {
+		t.Fatalf("ListOwnRepos returned error: %v", err)
+	}
+	if len(repos) != 1 {
+		t.Fatalf("expected 1 repo, got %d", len(repos))
+	}
+	if repos[0].Name != "private-repo" {
+		t.Fatalf("unexpected repo name: %q", repos[0].Name)
+	}
+	if !repos[0].IsPrivate {
+		t.Fatal("expected repo to be private")
+	}
+}
+
+// rewriteHostTransport redirects all HTTP requests to a fixed target base URL.
+// This lets tests exercise methods that use hardcoded API URLs (e.g. https://api.github.com/user).
+type rewriteHostTransport struct {
+	target string // e.g. "http://127.0.0.1:PORT"
+}
+
+func (t rewriteHostTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	cloned := req.Clone(req.Context())
+	cloned.URL.Scheme = "http"
+	cloned.URL.Host = strings.TrimPrefix(t.target, "http://")
+	cloned.Host = cloned.URL.Host
+	return http.DefaultTransport.RoundTrip(cloned)
+}
