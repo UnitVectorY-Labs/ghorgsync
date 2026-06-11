@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/model"
@@ -23,7 +24,7 @@ type Client struct {
 	tracef     func(string, ...any)
 
 	// cached authenticated user (populated lazily by GetAuthenticatedUser)
-	authUserOnce  bool
+	authUserOnce  sync.Once
 	authUserLogin string
 	authUserErr   error
 }
@@ -186,58 +187,55 @@ type ghUser struct {
 }
 
 // GetAuthenticatedUser returns the login of the authenticated token owner.
-// The result is cached after the first call.
+// The result is cached after the first call. Safe for concurrent use.
 func (c *Client) GetAuthenticatedUser() (string, error) {
-	if c.authUserOnce {
-		return c.authUserLogin, c.authUserErr
-	}
-	c.authUserOnce = true
+	c.authUserOnce.Do(func() {
+		const apiURL = "https://api.github.com/user"
+		req, err := http.NewRequest("GET", apiURL, nil)
+		if err != nil {
+			c.authUserErr = fmt.Errorf("creating request: %w", err)
+			return
+		}
+		req.Header.Set("Accept", "application/vnd.github+json")
+		if c.token != "" {
+			req.Header.Set("Authorization", "Bearer "+c.token)
+		}
+		c.verbosefSafe("api request: %s %s headers={Accept:%q Authorization:%t}",
+			req.Method, apiURL, req.Header.Get("Accept"), c.token != "")
 
-	const apiURL = "https://api.github.com/user"
-	req, err := http.NewRequest("GET", apiURL, nil)
-	if err != nil {
-		c.authUserErr = fmt.Errorf("creating request: %w", err)
-		return "", c.authUserErr
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
-	}
-	c.verbosefSafe("api request: %s %s headers={Accept:%q Authorization:%t}",
-		req.Method, apiURL, req.Header.Get("Accept"), c.token != "")
+		resp, err := c.httpClient.Do(req)
+		if err != nil {
+			c.authUserErr = fmt.Errorf("requesting user: %w", err)
+			return
+		}
+		c.verbosefSafe("api response: %s %s status=%d", req.Method, apiURL, resp.StatusCode)
 
-	resp, err := c.httpClient.Do(req)
-	if err != nil {
-		c.authUserErr = fmt.Errorf("requesting user: %w", err)
-		return "", c.authUserErr
-	}
-	c.verbosefSafe("api response: %s %s status=%d", req.Method, apiURL, resp.StatusCode)
+		bodyBytes, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			c.authUserErr = fmt.Errorf("reading response body: %w", err)
+			return
+		}
+		c.tracefSafe("api body: %s", bytes.TrimSpace(bodyBytes))
 
-	bodyBytes, err := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if err != nil {
-		c.authUserErr = fmt.Errorf("reading response body: %w", err)
-		return "", c.authUserErr
-	}
-	c.tracefSafe("api body: %s", bytes.TrimSpace(bodyBytes))
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			c.authUserErr = fmt.Errorf("GitHub API auth error (HTTP %d): check your token", resp.StatusCode)
+			return
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			c.authUserErr = fmt.Errorf("GitHub API error (HTTP %d)", resp.StatusCode)
+			return
+		}
 
-	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		c.authUserErr = fmt.Errorf("GitHub API auth error (HTTP %d): check your token", resp.StatusCode)
-		return "", c.authUserErr
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		c.authUserErr = fmt.Errorf("GitHub API error (HTTP %d)", resp.StatusCode)
-		return "", c.authUserErr
-	}
+		var u ghUser
+		if err := json.Unmarshal(bodyBytes, &u); err != nil {
+			c.authUserErr = fmt.Errorf("decoding response: %w", err)
+			return
+		}
 
-	var u ghUser
-	if err := json.Unmarshal(bodyBytes, &u); err != nil {
-		c.authUserErr = fmt.Errorf("decoding response: %w", err)
-		return "", c.authUserErr
-	}
-
-	c.authUserLogin = u.Login
-	return c.authUserLogin, nil
+		c.authUserLogin = u.Login
+	})
+	return c.authUserLogin, c.authUserErr
 }
 
 // ListOwnRepos lists all repositories (public and private) for the authenticated user.

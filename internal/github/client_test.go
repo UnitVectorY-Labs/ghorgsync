@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 )
@@ -234,9 +235,13 @@ type rewriteHostTransport struct {
 }
 
 func (t rewriteHostTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	parsed, err := url.Parse(t.target)
+	if err != nil {
+		return nil, fmt.Errorf("rewriteHostTransport: invalid target %q: %w", t.target, err)
+	}
 	cloned := req.Clone(req.Context())
-	cloned.URL.Scheme = "http"
-	cloned.URL.Host = strings.TrimPrefix(t.target, "http://")
-	cloned.Host = cloned.URL.Host
+	cloned.URL.Scheme = parsed.Scheme
+	cloned.URL.Host = parsed.Host
+	cloned.Host = parsed.Host
 	return http.DefaultTransport.RoundTrip(cloned)
 }
