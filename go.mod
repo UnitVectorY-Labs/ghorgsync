@@ -1,6 +1,6 @@
 module github.com/UnitVectorY-Labs/ghorgsync
 
-go 1.26 // GOVERSION
+go 1.26.0 // GOVERSION
 
 require (
 	golang.org/x/term v0.44.0
