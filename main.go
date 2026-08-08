@@ -10,6 +10,7 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"github.com/UnitVectorY-Labs/ghorgsync/internal/cleanup"
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/config"
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/github"
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/model"
@@ -67,11 +68,22 @@ func main() {
 	noProgressFlag := flag.Bool("no-progress", false, "Suppress the live progress bar (useful for scripting, CI, and when output is consumed by another program)")
 	cloneOnlyFlag := flag.Bool("clone", false, "Only clone missing repositories (skip processing existing repos)")
 	statusFlag := flag.Bool("status", false, "Show status of repositories (dirty repos and branch drift only)")
+	cleanFlag := flag.Bool("clean", false, "Remove git-ignored files and directories after syncing (asks for confirmation)")
+	forceFlag := flag.Bool("force", false, "Skip the confirmation required by --clean")
+	dryRunFlag := flag.Bool("dry-run", false, "With --clean, report ignored content that would be removed without deleting it")
 	flag.Parse()
 
 	// Mode flags are mutually exclusive
 	if *cloneOnlyFlag && *statusFlag {
 		fmt.Fprintln(os.Stderr, "error: --clone and --status are mutually exclusive")
+		os.Exit(1)
+	}
+	if (*forceFlag || *dryRunFlag) && !*cleanFlag {
+		fmt.Fprintln(os.Stderr, "error: --force and --dry-run require --clean")
+		os.Exit(1)
+	}
+	if *cleanFlag && (*cloneOnlyFlag || *statusFlag) {
+		fmt.Fprintln(os.Stderr, "error: --clean is only available with the default sync mode")
 		os.Exit(1)
 	}
 
@@ -209,12 +221,14 @@ func main() {
 
 		repoWorkTotal := len(scanResult.ManagedMissing) + len(scanResult.ManagedFound)
 		printer.StartRepoProgress(repoWorkTotal)
-
 		// Clone missing repos
 		for _, name := range scanResult.ManagedMissing {
 			repo := repoMap[name]
 			result := eng.CloneRepo(repo)
 			handleResult(printer, result, &summary)
+			if *cleanFlag && result.Action == model.ActionCloned {
+				cleanRepoIgnoredContent(eng, dir, name, printer, *forceFlag, *dryRunFlag, &summary)
+			}
 			printer.AdvanceRepoProgress()
 		}
 
@@ -223,6 +237,9 @@ func main() {
 			repo := repoMap[name]
 			result := eng.ProcessRepo(repo)
 			handleResult(printer, result, &summary)
+			if *cleanFlag {
+				cleanRepoIgnoredContent(eng, dir, name, printer, *forceFlag, *dryRunFlag, &summary)
+			}
 			printer.AdvanceRepoProgress()
 		}
 
@@ -242,6 +259,7 @@ func main() {
 		for _, entry := range scanResult.ExcludedButPresent {
 			printer.ExcludedButPresent(entry.Name)
 		}
+
 	}
 
 	// Print summary
@@ -255,6 +273,58 @@ func main() {
 		summary.ExcludedButPresent,
 		summary.Errors,
 	)
+}
+
+// cleanRepoIgnoredContent is the final phase for one repository. It runs
+// immediately after that repository's normal sync work.
+func cleanRepoIgnoredContent(eng *sync.Engine, baseDir, name string, printer *output.Printer, force, dryRun bool, summary *model.Summary) {
+	repoDir := filepath.Join(baseDir, name)
+	paths, err := eng.Git.IgnoredPaths(repoDir)
+	if err != nil {
+		printer.RepoError(name, "cleanup-error", err)
+		summary.Errors++
+		return
+	}
+	targets, err := cleanup.Plan(repoDir, paths)
+	if err != nil {
+		printer.RepoError(name, "cleanup-error", err)
+		summary.Errors++
+		return
+	}
+	if len(targets) == 0 {
+		printer.Verbose("cleanup: %s has no ignored content", name)
+		return
+	}
+
+	files, _ := cleanup.Counts(targets)
+	printer.RepoCleanupPlanned(name, files, cleanup.TotalSize(targets), dryRun)
+	if dryRun {
+		for _, target := range targets {
+			printer.Verbose("cleanup: %s would remove %s", name, target.Path)
+		}
+		return
+	}
+	if !force && !printer.ConfirmCleanup(name) {
+		return
+	}
+
+	for _, target := range targets {
+		if err := cleanup.Remove(repoDir, target); err != nil {
+			printer.RepoError(name, "cleanup-error", err)
+			summary.Errors++
+			continue
+		}
+		printer.Verbose("cleanup: %s removed %s", name, target.Path)
+		removedDirs, err := cleanup.PruneEmptyParents(repoDir, target)
+		if err != nil {
+			printer.RepoError(name, "cleanup-error", err)
+			summary.Errors++
+			continue
+		}
+		for _, dir := range removedDirs {
+			printer.Verbose("cleanup: %s removed %s/", name, dir)
+		}
+	}
 }
 
 // handleResult maps a RepoResult to the appropriate printer call and updates summary counts.

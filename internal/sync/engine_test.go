@@ -18,20 +18,23 @@ type mockGitRunner struct {
 	statusErr     error
 }
 
-func (m *mockGitRunner) Clone(url, dest string) error                         { return nil }
-func (m *mockGitRunner) Fetch(repoDir string) error                           { return nil }
-func (m *mockGitRunner) SubmoduleUpdate(repoDir string) error                 { return nil }
-func (m *mockGitRunner) Checkout(repoDir, branch string) error                { return nil }
-func (m *mockGitRunner) PullFF(repoDir string) (bool, error)                  { return false, nil }
-func (m *mockGitRunner) RemoteURL(repoDir string) (string, error)             { return "", nil }
-func (m *mockGitRunner) DiffStats(repoDir string) (int, int, error)           { return 0, 0, nil }
-func (m *mockGitRunner) CurrentBranch(repoDir string) (string, error)         { return m.currentBranch, m.branchErr }
+func (m *mockGitRunner) Clone(url, dest string) error               { return nil }
+func (m *mockGitRunner) Fetch(repoDir string) error                 { return nil }
+func (m *mockGitRunner) SubmoduleUpdate(repoDir string) error       { return nil }
+func (m *mockGitRunner) Checkout(repoDir, branch string) error      { return nil }
+func (m *mockGitRunner) PullFF(repoDir string) (bool, error)        { return false, nil }
+func (m *mockGitRunner) RemoteURL(repoDir string) (string, error)   { return "", nil }
+func (m *mockGitRunner) DiffStats(repoDir string) (int, int, error) { return 0, 0, nil }
+func (m *mockGitRunner) CurrentBranch(repoDir string) (string, error) {
+	return m.currentBranch, m.branchErr
+}
 func (m *mockGitRunner) IsDirty(repoDir string) (bool, []model.DirtyFile, error) {
 	return m.dirty, m.dirtyFiles, m.dirtyErr
 }
 func (m *mockGitRunner) StatusShort(repoDir string) (string, error) {
 	return m.statusOutput, m.statusErr
 }
+func (m *mockGitRunner) IgnoredPaths(repoDir string) ([]string, error) { return nil, nil }
 
 func TestStatusRepo_CleanOnDefaultBranch(t *testing.T) {
 	eng := &Engine{

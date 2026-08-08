@@ -39,6 +39,7 @@ func (m *loggingMockGitRunner) RemoteURL(repoDir string) (string, error) {
 func (m *loggingMockGitRunner) StatusShort(repoDir string) (string, error) {
 	return m.statusShort, m.statusErr
 }
+func (m *loggingMockGitRunner) IgnoredPaths(repoDir string) ([]string, error) { return nil, nil }
 
 func TestNewLoggingGitRunner_WithNilLoggerReturnsOriginalRunner(t *testing.T) {
 	base := &loggingMockGitRunner{}

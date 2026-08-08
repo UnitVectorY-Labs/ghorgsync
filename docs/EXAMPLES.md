@@ -274,6 +274,29 @@ Summary:
 
 This mode performs no git operations that modify repositories — no fetch, checkout, or pull. It is purely read-only and safe to run at any time.
 
+### Ignored Content Cleanup
+
+Use `--clean` after the normal sync to remove ignored build artifacts and caches. ghorgsync shows the proposed content and waits for confirmation:
+
+```
+$ ghorgsync --clean
+  repo  web-frontend  [updated]
+  repo  web-frontend  [cleanup: 42 files, 18.4 MiB would be removed]
+  repo web-frontend cleanup: remove this ignored content? [y/N] y
+
+Summary:
+  total: 10 | cloned: 0 | updated: 1 | dirty: 0 | branch-drift: 0 | unknown: 0 | excluded-but-present: 0 | errors: 0
+```
+
+Preview a cleanup without changing anything or being prompted:
+
+```
+$ ghorgsync --clean --dry-run
+  repo  web-frontend  [cleanup: 42 files, 18.4 MiB would be removed (dry-run)]
+```
+
+For automation, use `--clean --force` only after reviewing a dry run. Add `--verbose` to either command to list every path that would be removed (dry run) or that was removed (cleanup).
+
 ## Troubleshooting
 
 ### Missing Dotfile

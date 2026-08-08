@@ -1,6 +1,7 @@
 package output
 
 import (
+	"bufio"
 	"fmt"
 	"os"
 	"strings"
@@ -379,6 +380,63 @@ func (p *Printer) RepoError(name, action string, err error) {
 			p.colorize(red, "["+action+"]"),
 			p.colorize(red, err.Error()))
 	})
+}
+
+// RepoCleanupPlanned reports ignored content selected for cleanup or dry-run.
+func (p *Printer) RepoCleanupPlanned(name string, files int, size int64, dryRun bool) {
+	verb := "removed"
+	if dryRun {
+		verb = "removed (dry-run)"
+	}
+	content := fmt.Sprintf("%d files, %s", files, formatBytes(size))
+	p.withProgressSuspended(func() {
+		fmt.Printf("  %s %s %s\n",
+			p.colorize(cyan, "repo"),
+			p.colorize(bold, name),
+			p.colorize(yellow, "[cleanup: "+content+" would be "+verb+"]"))
+	})
+}
+
+// CleanupCancelled reports that the user declined the cleanup confirmation.
+func (p *Printer) CleanupCancelled() {
+	p.withProgressSuspended(func() {
+		fmt.Println(p.colorize(yellow, "  cleanup [cancelled]"))
+	})
+}
+
+// ConfirmCleanup prompts before deleting ignored content for one repository.
+func (p *Printer) ConfirmCleanup(name string) bool {
+	confirmed := false
+	p.withProgressSuspended(func() {
+		fmt.Printf("  repo %s cleanup: remove this ignored content? [y/N] ", name)
+		answer, err := bufio.NewReader(os.Stdin).ReadString('\n')
+		if err != nil && len(answer) == 0 {
+			fmt.Println()
+			return
+		}
+		answer = strings.ToLower(strings.TrimSpace(answer))
+		confirmed = answer == "y" || answer == "yes"
+	})
+	if !confirmed {
+		p.CleanupCancelled()
+	}
+	return confirmed
+}
+
+func formatBytes(size int64) string {
+	const unit = int64(1024)
+	if size < unit {
+		return fmt.Sprintf("%d B", size)
+	}
+	units := []string{"KiB", "MiB", "GiB", "TiB"}
+	value := float64(size)
+	for _, suffix := range units {
+		value /= float64(unit)
+		if value < float64(unit) || suffix == units[len(units)-1] {
+			return fmt.Sprintf("%.1f %s", value, suffix)
+		}
+	}
+	return fmt.Sprintf("%d B", size)
 }
 
 // UnknownFolder prints an unknown folder finding.

@@ -134,3 +134,14 @@ func (g *LoggingGitRunner) StatusShort(repoDir string) (string, error) {
 	g.logf("git exit: 0 lines=%d", lines)
 	return status, nil
 }
+
+func (g *LoggingGitRunner) IgnoredPaths(repoDir string) ([]string, error) {
+	g.logf("git cmd: git -C %s ls-files -z --others --ignored --exclude-standard", repoDir)
+	paths, err := g.next.IgnoredPaths(repoDir)
+	if err != nil {
+		g.logf("git exit: 1 error=%q", err.Error())
+		return nil, err
+	}
+	g.logf("git exit: 0 ignored-paths=%d", len(paths))
+	return paths, nil
+}
