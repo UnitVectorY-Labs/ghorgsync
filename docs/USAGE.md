@@ -68,10 +68,13 @@ ghorgsync [flags]
 | `--no-progress` | Suppress the live progress bar. Action and finding output is still printed; only the re-drawn `%` progress lines are omitted. Useful for scripting, CI pipelines, and when the tool's output is consumed by another program or redirected to a file. |
 | `--clone` | Clone-only mode: only clone missing repositories (see [Clone-Only Mode](#clone-only-mode)) |
 | `--status` | Status mode: show only dirty repos and branch drift (see [Status Mode](#status-mode)) |
+| `--clean` | After each repository's normal sync work, remove its Git-ignored files and directories (see [Ignored Content Cleanup](#ignored-content-cleanup)). Prompts for confirmation unless `--force` is supplied. |
+| `--force` | Skip the confirmation prompt for `--clean`. Requires `--clean`. |
+| `--dry-run` | With `--clean`, report the ignored content that would be removed without deleting anything or prompting. Requires `--clean`. |
 
 ### Mode Flags
 
-The `--clone` and `--status` flags are mode flags that change the sync behavior. Mode flags are mutually exclusive; if multiple mode flags are provided, the command exits with an error.
+The `--clone` and `--status` flags are mode flags that change the sync behavior. Mode flags are mutually exclusive; if multiple mode flags are provided, the command exits with an error. `--clean` is available only with the default sync mode, so it cannot be combined with `--clone` or `--status`.
 
 ## Runtime Behavior
 
@@ -91,7 +94,8 @@ When invoked, **ghorgsync** performs the following steps:
 6. **Clone missing repositories**.
 7. **Process existing repositories** (fetch, audit, conditionally checkout and pull).
 8. **Report findings** (collisions, unknown folders, excluded-but-present).
-9. **Print a summary line** with counts.
+9. **Optionally clean ignored content** as the final step for each managed repository when `--clean` was requested.
+10. **Print a summary line** with counts.
 
 During the repository clone/process phase, **ghorgsync** shows a live progress bar on TTY output to indicate completion across managed repositories. The progress bar scales to the full terminal width and uses smooth Unicode block characters (▏▎▍▌▋▊▉█) for high-resolution progress feedback. The layout shows the `repo` label and a padded counter on the left, a proportional bar in the center, and a color-coded percentage on the right:
 
@@ -155,11 +159,31 @@ For each included repository that exists locally:
    - Run `git submodule update --init --recursive` again to update submodule pointers to match any new commits brought in by the pull.
    - Report whether the repo was updated or already current.
 
+### Ignored Content Cleanup
+
+Pass `--clean` to remove build products, caches, and other ignored content left behind in managed repositories. Cleanup is the final step for each repository: its normal clone, fetch, dirty-state, checkout, and pull work completes first, then its ignored content is inspected and cleaned before ghorgsync starts the next repository. It applies to dirty repositories too; only ignored content is selected, so staged, unstaged, and untracked files are never removed.
+
+Ignored paths are identified with:
+
+```
+git ls-files -z --others --ignored --exclude-standard
+```
+
+The NUL-delimited form safely handles unusual file names. Before deleting a repository's content, ghorgsync reports the number of files and bytes selected and asks:
+
+```
+repo example-repo cleanup: remove this ignored content? [y/N]
+```
+
+Only `y` or `yes` confirms the deletion. Use `--force` when running non-interactively and you have reviewed the cleanup scope. Use `--dry-run` to obtain the same per-repository counts without prompting or changing any files. `--dry-run` takes precedence over `--force` and never deletes content.
+
+At normal verbosity, each repository shows the aggregate cleanup result. `--verbose` additionally prints every ignored path that would be removed in a dry run, or every path after it is deleted during a real cleanup.
+
 ### Non-Destructive Guarantees
 
 **ghorgsync** enforces hard constraints that must never be violated:
 
-- **Never deletes directories:** unknown folders and excluded-but-present repos are reported but left untouched.
+- **Never deletes directories by default:** unknown folders and excluded-but-present repos are reported but left untouched. The explicit `--clean` option is the sole exception: after confirmation (or with `--force`), it removes only Git-ignored files and directories inside managed repositories.
 - **Never discards local changes:** dirty repos are skipped for checkout/pull operations.
 - **Never runs destructive git commands:** no `git reset --hard`, no `git clean -fd`, no force checkouts.
 - `fetch` is always considered safe and is always performed.

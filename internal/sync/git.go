@@ -21,6 +21,7 @@ type GitRunner interface {
 	PullFF(repoDir string) (bool, error) // returns true if changes were pulled
 	RemoteURL(repoDir string) (string, error)
 	StatusShort(repoDir string) (string, error) // returns colorized short status output
+	IgnoredPaths(repoDir string) ([]string, error)
 }
 
 // ExecGitRunner runs real git commands.
@@ -205,4 +206,20 @@ func (g *ExecGitRunner) StatusShort(repoDir string) (string, error) {
 		g.tracefSafe("git output:\n%s", s)
 	}
 	return string(out), nil
+}
+
+// IgnoredPaths returns ignored files and directories, using NUL delimiters so
+// paths containing newlines are handled correctly.
+func (g *ExecGitRunner) IgnoredPaths(repoDir string) ([]string, error) {
+	cmd := exec.Command("git", "-C", repoDir, "ls-files", "-z", "--others", "--ignored", "--exclude-standard")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("git ls-files ignored: %w", err)
+	}
+	paths := strings.Split(strings.TrimSuffix(string(out), "\x00"), "\x00")
+	if len(paths) == 1 && paths[0] == "" {
+		return nil, nil
+	}
+	g.tracefSafe("git output: %d ignored paths", len(paths))
+	return paths, nil
 }
