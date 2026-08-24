@@ -118,6 +118,34 @@ func TestListRepos_NoTraceLogger_BodyNotLogged(t *testing.T) {
 	}
 }
 
+func TestListRepos_ZeroSizeRepoIsEmptyEvenWhenPushedAtIsSet(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		fmt.Fprintln(w, `[
+			{"name":"empty","clone_url":"https://github.com/acme/empty.git","default_branch":"main","private":false,"archived":false,"size":0,"pushed_at":"2026-08-24T21:00:05Z"},
+			{"name":"populated","clone_url":"https://github.com/acme/populated.git","default_branch":"main","private":false,"archived":false,"size":1,"pushed_at":"2026-08-24T21:00:06Z"}
+		]`)
+	}))
+	defer server.Close()
+
+	client := NewClient("token", nil, nil)
+	client.httpClient = server.Client()
+
+	repos, err := client.listRepos(server.URL)
+	if err != nil {
+		t.Fatalf("listRepos returned error: %v", err)
+	}
+	if len(repos) != 2 {
+		t.Fatalf("expected 2 repos, got %d", len(repos))
+	}
+	if !repos[0].IsEmpty {
+		t.Fatal("expected zero-size repository to be empty")
+	}
+	if repos[1].IsEmpty {
+		t.Fatal("expected non-zero-size repository not to be empty")
+	}
+}
+
 func TestSanitizeRequestURL_RedactsSensitiveQueryValues(t *testing.T) {
 	url := "https://api.github.com/orgs/acme/repos?page=2&access_token=abc123&token=super-secret-token&other=value"
 	sanitized := sanitizeRequestURL(url)
