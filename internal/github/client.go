@@ -64,12 +64,12 @@ func ResolveToken() string {
 
 // ghRepo is the JSON shape returned by the GitHub repos API.
 type ghRepo struct {
-	Name          string  `json:"name"`
-	CloneURL      string  `json:"clone_url"`
-	DefaultBranch string  `json:"default_branch"`
-	Private       bool    `json:"private"`
-	Archived      bool    `json:"archived"`
-	PushedAt      *string `json:"pushed_at"`
+	Name          string `json:"name"`
+	CloneURL      string `json:"clone_url"`
+	DefaultBranch string `json:"default_branch"`
+	Private       bool   `json:"private"`
+	Archived      bool   `json:"archived"`
+	Size          *int   `json:"size"`
 }
 
 // listRepos fetches all repositories from the given paginated GitHub API URL.
@@ -120,7 +120,11 @@ func (c *Client) listRepos(url string) ([]model.RepoInfo, error) {
 				DefaultBranch: r.DefaultBranch,
 				IsPrivate:     r.Private,
 				IsArchived:    r.Archived,
-				IsEmpty:       r.PushedAt == nil,
+				// GitHub sets pushed_at when a repository is created, even when it
+				// contains no commits. A reported size of zero is the reliable
+				// indicator that the repository has no git history. Keep a missing
+				// size conservative: it must not suppress a clone.
+				IsEmpty: r.Size != nil && *r.Size == 0,
 			})
 		}
 
