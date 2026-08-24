@@ -6,8 +6,14 @@ import (
 )
 
 // FilterRepos applies visibility, archived, and exclusion filters to the repo list.
-func FilterRepos(repos []model.RepoInfo, cfg *config.Config) (included []model.RepoInfo, excluded []string) {
+// It returns the included repos, excluded repo names, and the names of empty (never-pushed) repos.
+func FilterRepos(repos []model.RepoInfo, cfg *config.Config) (included []model.RepoInfo, excluded []string, empty []string) {
 	for _, r := range repos {
+		// Skip empty (uninitialized) repositories — they have no commits and cannot be cloned.
+		if r.IsEmpty {
+			empty = append(empty, r.Name)
+			continue
+		}
 		// Visibility filter
 		if r.IsPrivate && !cfg.ShouldIncludePrivate() {
 			continue

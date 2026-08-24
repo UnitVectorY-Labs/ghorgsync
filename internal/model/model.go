@@ -7,6 +7,7 @@ type RepoInfo struct {
 	DefaultBranch string
 	IsPrivate     bool
 	IsArchived    bool
+	IsEmpty       bool // true when the repository has no commits (never pushed to)
 }
 
 // LocalClassification represents the classification of a local directory entry.
@@ -121,4 +122,5 @@ type Summary struct {
 	UnknownFolders     int
 	ExcludedButPresent int
 	Errors             int
+	Empty              int // repositories that exist on GitHub but have no commits
 }

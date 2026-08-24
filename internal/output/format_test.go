@@ -6,7 +6,7 @@ import (
 )
 
 func TestFormatSummaryLine(t *testing.T) {
-	line := FormatSummaryLine(10, 2, 3, 1, 1, 2, 1, 0)
+	line := FormatSummaryLine(10, 2, 3, 1, 1, 2, 1, 0, 0)
 	if !strings.Contains(line, "total: 10") {
 		t.Error("should contain total")
 	}
@@ -22,9 +22,23 @@ func TestFormatSummaryLine(t *testing.T) {
 }
 
 func TestFormatSummaryLine_AllZeros(t *testing.T) {
-	line := FormatSummaryLine(0, 0, 0, 0, 0, 0, 0, 0)
+	line := FormatSummaryLine(0, 0, 0, 0, 0, 0, 0, 0, 0)
 	if !strings.Contains(line, "total: 0") {
 		t.Error("should contain total: 0")
+	}
+}
+
+func TestFormatSummaryLine_WithEmpty(t *testing.T) {
+	line := FormatSummaryLine(10, 2, 3, 1, 1, 2, 1, 0, 3)
+	if !strings.Contains(line, "empty: 3") {
+		t.Error("should contain empty: 3")
+	}
+}
+
+func TestFormatSummaryLine_NoEmptyWhenZero(t *testing.T) {
+	line := FormatSummaryLine(10, 2, 3, 1, 1, 2, 1, 0, 0)
+	if strings.Contains(line, "empty") {
+		t.Error("should not contain empty when count is 0")
 	}
 }
 

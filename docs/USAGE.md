@@ -271,6 +271,14 @@ GitHub repositories can be archived, making them read-only. **ghorgsync** treats
 - **Default (`include_archived: false`):** Archived repositories are ignored entirely. They are not cloned and are not synced. If a local directory exists for an archived repository, it is classified as **excluded-but-present** and reported accordingly.
 - **Opt-in (`include_archived: true`):** Archived repositories are treated like any other repository — cloned if missing, and synced (fetch/audit) if present.
 
+## Empty (Uninitialized) Repositories
+
+A GitHub repository that has never had any commits pushed to it is considered *empty*. **ghorgsync** detects empty repositories via the `pushed_at` field in the GitHub API response: if this value is `null`, the repository has no git history and cannot be cloned.
+
+Empty repositories are silently skipped — they are not cloned, not synced, and do not count towards the total. When one or more empty repositories are encountered, the final summary line includes an `empty: N` counter. No local action is taken for empty repositories.
+
+This detection requires no additional API calls; the `pushed_at` timestamp is returned as part of the standard repository listing response.
+
 ## User Mode and Private Repositories
 
 When `user` is set in the configuration, **ghorgsync** automatically detects whether the configured username matches the authenticated token owner:

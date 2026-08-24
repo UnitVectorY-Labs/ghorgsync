@@ -152,8 +152,8 @@ func main() {
 	}
 
 	// Filter repos
-	included, excludedNames := github.FilterRepos(allRepos, cfg)
-	printer.Verbose("Found %d repositories (%d included, %d excluded)", len(allRepos), len(included), len(excludedNames))
+	included, excludedNames, emptyRepos := github.FilterRepos(allRepos, cfg)
+	printer.Verbose("Found %d repositories (%d included, %d excluded, %d empty)", len(allRepos), len(included), len(excludedNames), len(emptyRepos))
 
 	// Scan directory
 	dir, _ := os.Getwd()
@@ -175,6 +175,7 @@ func main() {
 	// Summary counters
 	var summary model.Summary
 	summary.TotalRepos = len(included)
+	summary.Empty = len(emptyRepos)
 
 	if *cloneOnlyFlag {
 		// Clone-only mode: only clone missing repos, skip everything else
@@ -272,6 +273,7 @@ func main() {
 		summary.UnknownFolders,
 		summary.ExcludedButPresent,
 		summary.Errors,
+		summary.Empty,
 	)
 }
 

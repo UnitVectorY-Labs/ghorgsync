@@ -546,7 +546,7 @@ type DirtyFileInfo struct {
 }
 
 // Summary prints the final summary block.
-func (p *Printer) Summary(total, cloned, updated, dirty, branchDrift, unknown, excluded, errors int) {
+func (p *Printer) Summary(total, cloned, updated, dirty, branchDrift, unknown, excluded, errors, empty int) {
 	p.withProgressSuspended(func() {
 		fmt.Println()
 		fmt.Println(p.colorize(bold, "Summary:"))
@@ -589,6 +589,9 @@ func (p *Printer) Summary(total, cloned, updated, dirty, branchDrift, unknown, e
 			parts = append(parts, p.colorize(red, fmt.Sprintf("errors: %d", errors)))
 		} else {
 			parts = append(parts, fmt.Sprintf("errors: %d", errors))
+		}
+		if empty > 0 {
+			parts = append(parts, p.colorize(yellow, fmt.Sprintf("empty: %d", empty)))
 		}
 
 		fmt.Println("  " + strings.Join(parts, " | "))
