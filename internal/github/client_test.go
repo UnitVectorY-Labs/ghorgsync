@@ -15,7 +15,7 @@ func TestListRepos_VerboseLogsRequestsAndResponses(t *testing.T) {
 			t.Fatalf("unexpected Authorization header: %q", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintln(w, `[{"name":"repo-one","clone_url":"https://github.com/acme/repo-one.git","default_branch":"main","private":false,"archived":false}]`)
+		fmt.Fprintln(w, `[{"name":"repo-one","full_name":"acme/repo-one","clone_url":"https://github.com/acme/repo-one.git","default_branch":"main","private":false,"archived":false,"size":10}]`)
 	}))
 	defer server.Close()
 
@@ -58,7 +58,7 @@ func TestListRepos_VerboseLogsRequestsAndResponses(t *testing.T) {
 }
 
 func TestListRepos_TraceLogsResponseBody(t *testing.T) {
-	repoJSON := `[{"name":"trace-repo","clone_url":"https://github.com/acme/trace-repo.git","default_branch":"main","private":false,"archived":false}]`
+	repoJSON := `[{"name":"trace-repo","full_name":"acme/trace-repo","clone_url":"https://github.com/acme/trace-repo.git","default_branch":"main","private":false,"archived":false,"size":10}]`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintln(w, repoJSON)
@@ -94,7 +94,7 @@ func TestListRepos_TraceLogsResponseBody(t *testing.T) {
 func TestListRepos_NoTraceLogger_BodyNotLogged(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintln(w, `[{"name":"repo-x","clone_url":"https://github.com/acme/repo-x.git","default_branch":"main","private":false,"archived":false}]`)
+		fmt.Fprintln(w, `[{"name":"repo-x","full_name":"acme/repo-x","clone_url":"https://github.com/acme/repo-x.git","default_branch":"main","private":false,"archived":false,"size":10}]`)
 	}))
 	defer server.Close()
 
@@ -118,31 +118,57 @@ func TestListRepos_NoTraceLogger_BodyNotLogged(t *testing.T) {
 	}
 }
 
-func TestListRepos_ZeroSizeRepoIsEmptyEvenWhenPushedAtIsSet(t *testing.T) {
+func TestListRepos_EmptyRepoDetection(t *testing.T) {
+	var commitsCalls []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintln(w, `[
-			{"name":"empty","clone_url":"https://github.com/acme/empty.git","default_branch":"main","private":false,"archived":false,"size":0,"pushed_at":"2026-08-24T21:00:05Z"},
-			{"name":"populated","clone_url":"https://github.com/acme/populated.git","default_branch":"main","private":false,"archived":false,"size":1,"pushed_at":"2026-08-24T21:00:06Z"}
-		]`)
+		switch r.URL.Path {
+		case "/repos/acme/initial-commit/commits":
+			commitsCalls = append(commitsCalls, r.URL.Path)
+			fmt.Fprintln(w, `[{"sha":"a897946dc7e30b9e9a1d447c0ce25d6076a27cef"}]`)
+		case "/repos/acme/never-pushed/commits":
+			commitsCalls = append(commitsCalls, r.URL.Path)
+			w.WriteHeader(http.StatusConflict)
+			fmt.Fprintln(w, `{"message":"Git Repository is empty."}`)
+		case "/repos/acme/populated/commits":
+			t.Errorf("commits endpoint must not be called for non-zero-size repos, got %s", r.URL.Path)
+		default:
+			fmt.Fprintln(w, `[
+				{"name":"populated","full_name":"acme/populated","clone_url":"https://github.com/acme/populated.git","default_branch":"main","private":false,"archived":false,"size":1234},
+				{"name":"initial-commit","full_name":"acme/initial-commit","clone_url":"https://github.com/acme/initial-commit.git","default_branch":"main","private":false,"archived":false,"size":0},
+				{"name":"never-pushed","full_name":"acme/never-pushed","clone_url":"https://github.com/acme/never-pushed.git","default_branch":"main","private":false,"archived":false,"size":0}
+			]`)
+		}
 	}))
 	defer server.Close()
 
 	client := NewClient("token", nil, nil)
-	client.httpClient = server.Client()
+	client.httpClient = &http.Client{Transport: rewriteHostTransport{target: server.URL}}
 
 	repos, err := client.listRepos(server.URL)
 	if err != nil {
 		t.Fatalf("listRepos returned error: %v", err)
 	}
-	if len(repos) != 2 {
-		t.Fatalf("expected 2 repos, got %d", len(repos))
+	if len(repos) != 3 {
+		t.Fatalf("expected 3 repos, got %d", len(repos))
 	}
-	if !repos[0].IsEmpty {
-		t.Fatal("expected zero-size repository to be empty")
+	if repos[0].IsEmpty {
+		t.Fatal("expected non-zero-size repository not to be empty")
 	}
 	if repos[1].IsEmpty {
-		t.Fatal("expected non-zero-size repository not to be empty")
+		t.Fatal("expected zero-size repository with an initial commit not to be empty")
+	}
+	if !repos[2].IsEmpty {
+		t.Fatal("expected zero-size repository with no commits to be empty")
+	}
+	wantCalls := []string{"/repos/acme/initial-commit/commits", "/repos/acme/never-pushed/commits"}
+	if len(commitsCalls) != len(wantCalls) {
+		t.Fatalf("expected commits calls %v, got %v", wantCalls, commitsCalls)
+	}
+	for i := range wantCalls {
+		if commitsCalls[i] != wantCalls[i] {
+			t.Fatalf("expected commits calls %v, got %v", wantCalls, commitsCalls)
+		}
 	}
 }
 
@@ -234,7 +260,7 @@ func TestListOwnRepos_ReturnsAllRepos(t *testing.T) {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
 		w.Header().Set("Content-Type", "application/json")
-		fmt.Fprintln(w, `[{"name":"private-repo","clone_url":"https://github.com/octocat/private-repo.git","default_branch":"main","private":true,"archived":false}]`)
+		fmt.Fprintln(w, `[{"name":"private-repo","full_name":"octocat/private-repo","clone_url":"https://github.com/octocat/private-repo.git","default_branch":"main","private":true,"archived":false,"size":10}]`)
 	}))
 	defer server.Close()
 
