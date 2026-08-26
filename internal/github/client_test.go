@@ -118,12 +118,13 @@ func TestListRepos_NoTraceLogger_BodyNotLogged(t *testing.T) {
 	}
 }
 
-func TestListRepos_ZeroSizeRepoIsEmptyEvenWhenPushedAtIsSet(t *testing.T) {
+func TestListRepos_EmptyDefaultBranchIsEmpty(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintln(w, `[
-			{"name":"empty","clone_url":"https://github.com/acme/empty.git","default_branch":"main","private":false,"archived":false,"size":0,"pushed_at":"2026-08-24T21:00:05Z"},
-			{"name":"populated","clone_url":"https://github.com/acme/populated.git","default_branch":"main","private":false,"archived":false,"size":1,"pushed_at":"2026-08-24T21:00:06Z"}
+			{"name":"never-pushed","clone_url":"https://github.com/acme/never-pushed.git","default_branch":"","private":false,"archived":false,"size":0,"pushed_at":null},
+			{"name":"initial-commit","clone_url":"https://github.com/acme/initial-commit.git","default_branch":"main","private":false,"archived":false,"size":0,"pushed_at":"2026-08-26T09:18:25Z"},
+			{"name":"populated","clone_url":"https://github.com/acme/populated.git","default_branch":"main","private":false,"archived":false,"size":1234,"pushed_at":"2026-08-24T21:00:06Z"}
 		]`)
 	}))
 	defer server.Close()
@@ -135,14 +136,17 @@ func TestListRepos_ZeroSizeRepoIsEmptyEvenWhenPushedAtIsSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("listRepos returned error: %v", err)
 	}
-	if len(repos) != 2 {
-		t.Fatalf("expected 2 repos, got %d", len(repos))
+	if len(repos) != 3 {
+		t.Fatalf("expected 3 repos, got %d", len(repos))
 	}
 	if !repos[0].IsEmpty {
-		t.Fatal("expected zero-size repository to be empty")
+		t.Fatal("expected repo with no default branch to be empty")
 	}
 	if repos[1].IsEmpty {
-		t.Fatal("expected non-zero-size repository not to be empty")
+		t.Fatal("expected repo with an initial commit (zero size) not to be empty")
+	}
+	if repos[2].IsEmpty {
+		t.Fatal("expected populated repository not to be empty")
 	}
 }
 

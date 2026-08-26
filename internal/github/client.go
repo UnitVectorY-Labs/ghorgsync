@@ -69,7 +69,6 @@ type ghRepo struct {
 	DefaultBranch string `json:"default_branch"`
 	Private       bool   `json:"private"`
 	Archived      bool   `json:"archived"`
-	Size          *int   `json:"size"`
 }
 
 // listRepos fetches all repositories from the given paginated GitHub API URL.
@@ -120,11 +119,12 @@ func (c *Client) listRepos(url string) ([]model.RepoInfo, error) {
 				DefaultBranch: r.DefaultBranch,
 				IsPrivate:     r.Private,
 				IsArchived:    r.Archived,
-				// GitHub sets pushed_at when a repository is created, even when it
-				// contains no commits. A reported size of zero is the reliable
-				// indicator that the repository has no git history. Keep a missing
-				// size conservative: it must not suppress a clone.
-				IsEmpty: r.Size != nil && *r.Size == 0,
+				// A repository has a default branch if and only if it has at least
+				// one commit. A repo with nothing pushed yet reports an empty
+				// default_branch; one initialized with files (e.g. a README) does
+				// not. The size field is in KB and truncates, so small repos
+				// report 0 and cannot distinguish the two cases.
+				IsEmpty: r.DefaultBranch == "",
 			})
 		}
 

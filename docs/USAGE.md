@@ -273,11 +273,11 @@ GitHub repositories can be archived, making them read-only. **ghorgsync** treats
 
 ## Empty (Uninitialized) Repositories
 
-A GitHub repository that has never had any commits pushed to it is considered *empty*. **ghorgsync** detects empty repositories via the `size` field in the GitHub API response: a value of `0` means the repository has no git history. GitHub sets `pushed_at` when a repository is created, so that field cannot reliably identify empty repositories.
+A GitHub repository that has never had any commits pushed to it is considered *empty*. **ghorgsync** detects empty repositories via the `default_branch` field in the GitHub API response: a repository with no commits has no default branch (an empty value), while any repository with at least one commit — including one initialized with a README at creation — has a non-empty default branch. The `size` field is reported in KB and truncates, so small repositories report `0` and cannot reliably identify empty repositories.
 
 Empty repositories are silently skipped — they are not cloned, not synced, and do not count towards the total. When one or more empty repositories are encountered, the final summary line includes an `empty: N` counter. No local action is taken for empty repositories.
 
-This detection requires no additional API calls; the `pushed_at` timestamp is returned as part of the standard repository listing response.
+This detection requires no additional API calls; the `default_branch` value is returned as part of the standard repository listing response.
 
 ## User Mode and Private Repositories
 
