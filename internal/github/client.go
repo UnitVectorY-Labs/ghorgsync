@@ -65,10 +65,12 @@ func ResolveToken() string {
 // ghRepo is the JSON shape returned by the GitHub repos API.
 type ghRepo struct {
 	Name          string `json:"name"`
+	FullName      string `json:"full_name"`
 	CloneURL      string `json:"clone_url"`
 	DefaultBranch string `json:"default_branch"`
 	Private       bool   `json:"private"`
 	Archived      bool   `json:"archived"`
+	Size          *int   `json:"size"`
 }
 
 // listRepos fetches all repositories from the given paginated GitHub API URL.
@@ -113,19 +115,24 @@ func (c *Client) listRepos(url string) ([]model.RepoInfo, error) {
 		}
 
 		for _, r := range page {
-			repos = append(repos, model.RepoInfo{
+			repo := model.RepoInfo{
 				Name:          r.Name,
 				CloneURL:      r.CloneURL,
 				DefaultBranch: r.DefaultBranch,
 				IsPrivate:     r.Private,
 				IsArchived:    r.Archived,
-				// A repository has a default branch if and only if it has at least
-				// one commit. A repo with nothing pushed yet reports an empty
-				// default_branch; one initialized with files (e.g. a README) does
-				// not. The size field is in KB and truncates, so small repos
-				// report 0 and cannot distinguish the two cases.
-				IsEmpty: r.DefaultBranch == "",
-			})
+			}
+			// A non-zero size guarantees git history. A zero (or missing) size
+			// is ambiguous: size is in KB and truncates, so a repo initialized
+			// at creation with just a README also reports 0, and
+			// default_branch cannot disambiguate because GitHub sets it at
+			// creation even for repos with no commits. Verify zero-size repos
+			// with one extra call: the commits endpoint answers 409 only when
+			// the repository has never received a commit.
+			if r.Size == nil || *r.Size == 0 {
+				repo.IsEmpty = c.repoIsEmpty(r.FullName)
+			}
+			repos = append(repos, repo)
 		}
 
 		url = nextLink(resp.Header.Get("Link"))
@@ -135,6 +142,39 @@ func (c *Client) listRepos(url string) ([]model.RepoInfo, error) {
 	}
 
 	return repos, nil
+}
+
+// repoIsEmpty reports whether a repository has no commits. It returns true
+// only on the definitive 409 from the commits endpoint ("Git Repository is
+// empty"); any other outcome is treated as not empty so a transient failure
+// never suppresses a clone.
+func (c *Client) repoIsEmpty(fullName string) bool {
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/commits?per_page=1", fullName)
+	req, err := http.NewRequest("GET", apiURL, nil)
+	if err != nil {
+		return false
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	if c.token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.token)
+	}
+	c.verbosefSafe("api request: %s %s headers={Accept:%q Authorization:%t}",
+		req.Method, apiURL, req.Header.Get("Accept"), c.token != "")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return false
+	}
+	c.verbosefSafe("api response: %s %s status=%d", req.Method, apiURL, resp.StatusCode)
+
+	bodyBytes, err := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if err != nil {
+		return false
+	}
+	c.tracefSafe("api body: %s", bytes.TrimSpace(bodyBytes))
+
+	return resp.StatusCode == http.StatusConflict
 }
 
 func (c *Client) verbosefSafe(format string, args ...any) {
