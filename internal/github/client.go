@@ -284,9 +284,9 @@ func (c *Client) GetAuthenticatedUser() (string, error) {
 	return c.authUserLogin, c.authUserErr
 }
 
-// ListOwnRepos lists all repositories (public and private) for the authenticated user.
+// ListOwnRepos lists all repositories (public and private) owned by the authenticated user.
 func (c *Client) ListOwnRepos() ([]model.RepoInfo, error) {
-	return c.listRepos("https://api.github.com/user/repos?per_page=100&page=1")
+	return c.listRepos("https://api.github.com/user/repos?affiliation=owner&per_page=100&page=1")
 }
 
 // nextLink parses the GitHub Link header and returns the URL for rel="next", or "".
