@@ -254,10 +254,13 @@ func TestGetAuthenticatedUser_AuthError(t *testing.T) {
 	}
 }
 
-func TestListOwnRepos_ReturnsAllRepos(t *testing.T) {
+func TestListOwnRepos_RequestsOwnedRepos(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/user/repos" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("affiliation"); got != "owner" {
+			t.Fatalf("expected affiliation %q, got %q", "owner", got)
 		}
 		w.Header().Set("Content-Type", "application/json")
 		fmt.Fprintln(w, `[{"name":"private-repo","full_name":"octocat/private-repo","clone_url":"https://github.com/octocat/private-repo.git","default_branch":"main","private":true,"archived":false,"size":10}]`)

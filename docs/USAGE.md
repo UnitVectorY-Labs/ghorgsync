@@ -283,7 +283,7 @@ This detection requires at most one additional API call per zero-size repository
 
 When `user` is set in the configuration, **ghorgsync** automatically detects whether the configured username matches the authenticated token owner:
 
-- **Matching user:** `GET /user/repos` is called, which returns all repositories — public and private — for the authenticated user. This ensures that private repositories are included when `include_private` is `true` (the default).
+- **Matching user:** `GET /user/repos?affiliation=owner` is called, which returns repositories owned by the authenticated user, including private repositories when `include_private` is `true` (the default). Repositories available only through collaboration or organization membership are not included.
 - **Different user:** `GET /users/{username}/repos` is called, which returns only public repositories for that user. If `include_private` is `true` (or not explicitly set), a verbose-level warning is emitted to indicate that private repositories cannot be fetched for a third-party user account.
 
 This detection happens at runtime on each invocation using a cached call to `GET /user`.
