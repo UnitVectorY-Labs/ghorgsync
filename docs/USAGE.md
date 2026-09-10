@@ -26,6 +26,8 @@ permalink: /usage
 |---|---|---|---|
 | `organization` | string | — | GitHub organization name to sync (mutually exclusive with `user`) |
 | `user` | string | — | GitHub user account name to sync (mutually exclusive with `organization`) |
+| `auth_user` | string | — | GitHub CLI username to authenticate as on github.com |
+| `auth_switch_back` | boolean | `false` | Restore the previous CLI account after a switch; requires `auth_user` |
 | `include_public` | boolean | `true` | Include public repositories |
 | `include_private` | boolean | `true` | Include private repositories |
 | `include_archived` | boolean | `false` | Include archived repositories |
@@ -33,6 +35,20 @@ permalink: /usage
 
 {: .highlight }
 Exactly one of `organization` or `user` must be specified. They cannot both be set.
+
+### Multiple GitHub Accounts
+
+Set `auth_user` to the GitHub CLI account that should perform this directory's sync. This is independent of `organization` or `user`, which identifies the owner of the repositories.
+
+After the startup gate and configuration validation, ghorgsync checks `gh auth status --hostname github.com --json hosts`. The requested account must already be logged in and have a successful authentication status. If it is already active, no switch is needed. Otherwise, ghorgsync runs `gh auth switch --hostname github.com --user USER` before reading the CLI token and fetching repositories. Actual switches are printed as `system auth [switched] USER`; an unchanged account is quiet.
+
+By default the selected account stays active. With `auth_switch_back: true`, ghorgsync remembers the previous account and restores it after the run, including normal error exits and `--clone` or `--status` runs, but only if ghorgsync switched accounts. If no previous account can be identified, the run stops before switching. Restoration failures are reported and cause exit code `1`. Restoration cannot be guaranteed if the process is interrupted or forcibly terminated.
+
+This feature requires a GitHub CLI version supporting JSON auth status and account switching. Missing CLI support, a missing or unhealthy requested account, and failed switches stop the run before repository operations. Log in to the desired account manually with `gh auth login --hostname github.com` first; ghorgsync does not perform an interactive login.
+
+When `auth_user` is set, `GH_TOKEN` and `GITHUB_TOKEN` must be unset, since they override CLI credentials. Without `auth_user`, existing token resolution is unchanged. Authentication is scoped to github.com. Switching updates the shared CLI active account, so avoid concurrent runs that select different accounts. Git continues using its configured credential helper or SSH keys; switching the CLI account does not replace independent Git credentials or SSH configuration.
+
+See the GitHub CLI manuals for [auth status](https://cli.github.com/manual/gh_auth_status) and [auth switch](https://cli.github.com/manual/gh_auth_switch).
 
 ### Exclude Patterns
 

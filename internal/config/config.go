@@ -4,12 +4,15 @@ import (
 	"fmt"
 	"os"
 	"regexp"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
 
 // Config represents the application configuration loaded from a YAML file.
 type Config struct {
+	AuthUser        string   `yaml:"auth_user"`
+	AuthSwitchBack  bool     `yaml:"auth_switch_back"`
 	Organization    string   `yaml:"organization"`
 	User            string   `yaml:"user"`
 	IncludePublic   *bool    `yaml:"include_public"`
@@ -38,6 +41,12 @@ func Load(path string) (*Config, error) {
 
 // Validate checks the configuration for logical errors.
 func (c *Config) Validate() error {
+	if c.AuthUser != strings.TrimSpace(c.AuthUser) {
+		return fmt.Errorf("auth_user must not contain leading or trailing whitespace")
+	}
+	if c.AuthSwitchBack && c.AuthUser == "" {
+		return fmt.Errorf("auth_switch_back requires auth_user")
+	}
 	if c.Organization != "" && c.User != "" {
 		return fmt.Errorf("organization and user are mutually exclusive; specify one but not both")
 	}

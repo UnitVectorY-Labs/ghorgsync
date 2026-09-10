@@ -34,6 +34,25 @@ Sync all repositories for a GitHub user account:
 user: my-username
 ```
 
+### Use a Specific GitHub Login
+
+Sync a work organization with an already logged-in work account, then restore the previously active CLI account:
+
+```yaml
+organization: my-work-org
+auth_user: my-work-login
+auth_switch_back: true
+```
+
+Omit `auth_switch_back` (or set it to `false`) to leave the work account active after the run. If it is already active, neither setting causes a switch. `auth_user` also works with `user`:
+
+```yaml
+user: my-personal-login
+auth_user: my-personal-login
+```
+
+Unset `GH_TOKEN` and `GITHUB_TOKEN` when using `auth_user`. See [Multiple GitHub Accounts](USAGE.md#multiple-github-accounts) for authentication requirements and error behavior.
+
 ### Public Repositories Only
 
 Exclude private repositories from syncing:

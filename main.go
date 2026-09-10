@@ -51,6 +51,11 @@ func (c *countFlag) Set(s string) error {
 
 // main is the entry point for the ghorgsync command-line tool.
 func main() {
+	os.Exit(run())
+}
+
+// run returns before main exits so account restoration runs on error paths too.
+func run() (exitCode int) {
 	// Set the build version from the build info if not set by the build system
 	if Version == "dev" || Version == "" {
 		if bi, ok := debug.ReadBuildInfo(); ok {
@@ -76,20 +81,20 @@ func main() {
 	// Mode flags are mutually exclusive
 	if *cloneOnlyFlag && *statusFlag {
 		fmt.Fprintln(os.Stderr, "error: --clone and --status are mutually exclusive")
-		os.Exit(1)
+		return 1
 	}
 	if (*forceFlag || *dryRunFlag) && !*cleanFlag {
 		fmt.Fprintln(os.Stderr, "error: --force and --dry-run require --clean")
-		os.Exit(1)
+		return 1
 	}
 	if *cleanFlag && (*cloneOnlyFlag || *statusFlag) {
 		fmt.Fprintln(os.Stderr, "error: --clean is only available with the default sync mode")
-		os.Exit(1)
+		return 1
 	}
 
 	if *versionFlag {
 		fmt.Println(versionString(Version))
-		os.Exit(0)
+		return 0
 	}
 
 	useColor := !*noColorFlag && output.ShouldColor()
@@ -99,7 +104,7 @@ func main() {
 	exePath, err := os.Executable()
 	if err != nil {
 		printer.SystemError("executable", err)
-		os.Exit(1)
+		return 1
 	}
 	baseName := filepath.Base(exePath)
 	ext := filepath.Ext(baseName)
@@ -110,22 +115,40 @@ func main() {
 
 	if _, err := os.Stat(dotfileName); os.IsNotExist(err) {
 		printer.MissingDotfile(dotfileName)
-		os.Exit(0)
+		return 0
 	}
 
 	// Load and validate config
 	cfg, err := config.Load(dotfileName)
 	if err != nil {
 		printer.ConfigError(err)
-		os.Exit(1)
+		return 1
 	}
 	if err := cfg.Validate(); err != nil {
 		printer.ConfigError(err)
-		os.Exit(1)
+		return 1
 	}
 
-	// Resolve token and create GitHub client
-	token := github.ResolveToken()
+	// Select the configured CLI account before resolving any API credentials.
+	var token string
+	if cfg.AuthUser != "" {
+		var restore func() error
+		token, restore, err = github.SelectAccount(cfg.AuthUser, cfg.AuthSwitchBack, printer.AuthSwitched)
+		if restore != nil {
+			defer func() {
+				if err := restore(); err != nil {
+					printer.AuthError(err)
+					exitCode = 1
+				}
+			}()
+		}
+		if err != nil {
+			printer.AuthError(err)
+			return 1
+		}
+	} else {
+		token = github.ResolveToken()
+	}
 	client := github.NewClient(token, printer.Verbose, printer.Trace)
 
 	var allRepos []model.RepoInfo
@@ -148,7 +171,7 @@ func main() {
 	}
 	if err != nil {
 		printer.AuthError(err)
-		os.Exit(1)
+		return 1
 	}
 
 	// Filter repos
@@ -160,7 +183,7 @@ func main() {
 	scanResult, err := scanner.ScanDirectory(dir, included, excludedNames, cfg)
 	if err != nil {
 		printer.SystemError("scan", err)
-		os.Exit(1)
+		return 1
 	}
 
 	// Create sync engine
@@ -213,7 +236,7 @@ func main() {
 		printer.FinishRepoProgress()
 
 		printer.StatusSummary(summary.TotalRepos, summary.Dirty, summary.BranchDrift)
-		os.Exit(0)
+		return 0
 	} else {
 		// Default mode: full sync
 		summary.UnknownFolders = len(scanResult.Unknown)
@@ -275,6 +298,7 @@ func main() {
 		summary.Errors,
 		summary.Empty,
 	)
+	return 0
 }
 
 // cleanRepoIgnoredContent is the final phase for one repository. It runs
