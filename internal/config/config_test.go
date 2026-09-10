@@ -259,3 +259,30 @@ include_archived: true
 		t.Error("ShouldIncludeArchived() = false, want true")
 	}
 }
+
+func TestAccountConfig(t *testing.T) {
+	for _, tt := range []struct {
+		name, yaml, user string
+		back, wantErr    bool
+	}{
+		{"defaults", "organization: acme\n", "", false, false},
+		{"select", "organization: acme\nauth_user: work\n", "work", false, false},
+		{"restore", "user: personal\nauth_user: work\nauth_switch_back: true\n", "work", true, false},
+		{"explicit false", "organization: acme\nauth_user: work\nauth_switch_back: false\n", "work", false, false},
+		{"missing account", "organization: acme\nauth_switch_back: true\n", "", true, true},
+		{"whitespace", "organization: acme\nauth_user: ' work '\n", " work ", false, true},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := Load(writeTestConfig(t, tt.yaml))
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cfg.AuthUser != tt.user || cfg.AuthSwitchBack != tt.back {
+				t.Fatalf("unexpected account config: %+v", cfg)
+			}
+			if err := cfg.Validate(); (err != nil) != tt.wantErr {
+				t.Fatalf("Validate() = %v, want error=%v", err, tt.wantErr)
+			}
+		})
+	}
+}

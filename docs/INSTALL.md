@@ -23,6 +23,8 @@ permalink: /install
   - `GH_TOKEN` environment variable
   - [GitHub CLI](https://cli.github.com/) (`gh`) authenticated session (used as fallback)
 
+For optional [account selection](USAGE.md#multiple-github-accounts) with `auth_user`, install a GitHub CLI version supporting `gh auth status --json hosts` and `gh auth switch`. Log in to each needed account with `gh auth login --hostname github.com` and unset `GITHUB_TOKEN` and `GH_TOKEN`.
+
 ## Installation Methods
 
 There are several ways to install **ghorgsync**:

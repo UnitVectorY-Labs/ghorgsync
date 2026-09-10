@@ -623,3 +623,10 @@ func (p *Printer) AuthError(err error) {
 			p.colorize(red, err.Error()))
 	})
 }
+
+// AuthSwitched reports an actual change to the active GitHub CLI account.
+func (p *Printer) AuthSwitched(user string) {
+	p.withProgressSuspended(func() {
+		fmt.Printf("  %s auth %s %s\n", p.colorize(cyan, "system"), p.colorize(green, "[switched]"), user)
+	})
+}
