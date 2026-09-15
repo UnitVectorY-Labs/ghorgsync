@@ -11,6 +11,7 @@ Working with many repositories across a GitHub organization or user account mean
 ## Key Features
 
 - **One command sync** — clones missing repos, fetches and pulls existing ones, all in one pass
+- **Parallel repository processing** — defaults to four times the logical CPU count; tune with `--workers` or `GHORGSYNC_WORKERS` ([details](docs/USAGE.md#repository-concurrency))
 - **Organization and user accounts** — sync repos from a GitHub organization or a personal user account
 - **Non-destructive** — never deletes directories, discards local changes, or runs destructive git commands
 - **Dirty repo detection** — reports staged/unstaged changes with file details and line counts

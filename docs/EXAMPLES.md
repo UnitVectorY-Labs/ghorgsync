@@ -18,6 +18,24 @@ permalink: /examples
 
 ## Configuration Examples
 
+### Tune Parallel Processing
+
+The default concurrency is four times the number of logical CPUs on the machine. Override it for a single run:
+
+```bash
+ghorgsync --workers 4
+```
+
+Or set a shell default, with an optional per-run override:
+
+```bash
+export GHORGSYNC_WORKERS=4
+ghorgsync
+ghorgsync --workers 1
+```
+
+The last command processes repositories sequentially even though the environment specifies four workers. Use `ghorgsync --workers 4 --verbose` to see elapsed times and repository-labeled diagnostics. `--clean` always processes repositories sequentially. See [Repository Concurrency](USAGE.md#repository-concurrency) for precedence and output behavior.
+
 ### Basic Organization Configuration
 
 Sync all repositories (public and private) in an organization:
