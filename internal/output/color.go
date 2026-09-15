@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"golang.org/x/term"
 )
@@ -65,8 +66,11 @@ func digitCount(n int) int {
 	return count
 }
 
-// Printer handles formatted output with optional color support.
+// Printer handles formatted output with optional color support. Public output
+// methods are safe for concurrent use; complete messages and progress redraws
+// share one lock. A Printer must not be copied after first use.
 type Printer struct {
+	mu           sync.Mutex
 	color        bool
 	verbosity    int // 0=quiet, 1=verbose, 2=trace
 	interactive  bool
@@ -113,6 +117,8 @@ func (p *Printer) colorize(color, text string) string {
 }
 
 func (p *Printer) withProgressSuspended(fn func()) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	redraw := p.clearLiveProgressLine()
 	fn()
 	if redraw {
@@ -223,6 +229,8 @@ func (p *Printer) renderProgressLine(termWidth int) string {
 
 // StartRepoProgress starts a live progress line for repository processing.
 func (p *Printer) StartRepoProgress(total int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if total <= 0 {
 		p.repoProgress = repoProgressState{}
 		return
@@ -241,6 +249,8 @@ func (p *Printer) StartRepoProgress(total int) {
 
 // AdvanceRepoProgress increments the repository progress bar by one.
 func (p *Printer) AdvanceRepoProgress() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if !p.repoProgress.active {
 		return
 	}
@@ -254,6 +264,8 @@ func (p *Printer) AdvanceRepoProgress() {
 
 // FinishRepoProgress renders the completed progress line and moves to the next line.
 func (p *Printer) FinishRepoProgress() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	if !p.repoProgress.active {
 		return
 	}
@@ -271,6 +283,13 @@ func (p *Printer) FinishRepoProgress() {
 func (p *Printer) Header(text string) {
 	p.withProgressSuspended(func() {
 		fmt.Println(p.colorize(bold, text))
+	})
+}
+
+// WorkerCount prints the effective worker limit at startup, even in quiet mode.
+func (p *Printer) WorkerCount(count int) {
+	p.withProgressSuspended(func() {
+		fmt.Println(p.colorize(gray, fmt.Sprintf("  workers: %d", count)))
 	})
 }
 

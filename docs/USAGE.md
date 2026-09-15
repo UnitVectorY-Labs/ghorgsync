@@ -82,6 +82,7 @@ ghorgsync [flags]
 | `--verbose` | Enable verbose diagnostics output (GitHub API requests/responses and local git commands/results; sensitive auth values are redacted). Repeat the flag (`--verbose --verbose`) to enable trace-level output that additionally includes raw git command output and API response bodies. |
 | `--no-color` | Disable color output |
 | `--no-progress` | Suppress the live progress bar. Action and finding output is still printed; only the re-drawn `%` progress lines are omitted. Useful for scripting, CI pipelines, and when the tool's output is consumed by another program or redirected to a file. |
+| `--workers N` | Maximum repositories processed concurrently. Defaults to four times the number of logical CPUs reported by Go. Overrides `GHORGSYNC_WORKERS`; use `1` for sequential processing. Must be a positive integer. `--clean` always runs sequentially. |
 | `--clone` | Clone-only mode: only clone missing repositories (see [Clone-Only Mode](#clone-only-mode)) |
 | `--status` | Status mode: show only dirty repos and branch drift (see [Status Mode](#status-mode)) |
 | `--clean` | After each repository's normal sync work, remove its Git-ignored files and directories (see [Ignored Content Cleanup](#ignored-content-cleanup)). Prompts for confirmation unless `--force` is supplied. |
@@ -91,6 +92,20 @@ ghorgsync [flags]
 ### Mode Flags
 
 The `--clone` and `--status` flags are mode flags that change the sync behavior. Mode flags are mutually exclusive; if multiple mode flags are provided, the command exits with an error. `--clean` is available only with the default sync mode, so it cannot be combined with `--clone` or `--status`.
+
+### Repository Concurrency
+
+At startup, after configuration validation and before authentication, ghorgsync prints `workers: N` in light gray (plain text when color is disabled), including at normal verbosity. This is the effective worker limit; fewer workers are started when a phase has fewer repositories. With `--clean`, it reports `workers: 1`.
+
+By default, ghorgsync processes up to four repositories per logical CPU (hardware thread), using `4 * runtime.NumCPU()` at process startup. Set `GHORGSYNC_WORKERS` or pass `--workers N` to tune this for your machine and connection. Precedence is **explicit flag > environment variable > 4 × logical CPU count**. An unset or empty environment variable uses the default; an invalid selected value produces a configuration error before authentication or repository operations. The startup dotfile gate still takes precedence.
+
+The limit applies to default sync, `--clone`, and `--status`. Missing repositories finish cloning before the existing-repository phase starts. Within each phase, workers take the next repository as soon as they finish; the actual worker count never exceeds the number of repositories in that phase. Commands within a repository retain their sequential order and existing dirty-tree and default-branch rules. Git may create its own subprocesses or threads, so this setting limits repositories, not total OS threads or network connections.
+
+`--workers 1` processes repositories sequentially. Runs with `--clean` also use one worker, including `--force` and `--dry-run`, so each repository's cleanup and any confirmation finish before the next repository begins. The worker count is still validated.
+
+Parallelism can overlap network waits; the best setting also depends on disk speed, bandwidth, repository sizes, and remote performance. Lower the limit if simultaneous clones or updates contend for those resources. `--verbose` reports discovery and scan times, each repository's processing time, and total elapsed time. Per-repository times overlap and should not be summed as wall-clock runtime.
+
+Results appear in completion order when parallelism is enabled. Summary counts are accumulated serially, and progress advances once per completed repository. Complete output messages (including multiline dirty reports and trace blocks) and progress clear/redraw operations share a lock, preventing interleaved messages or conflicting redraws. Verbose and trace diagnostics carry the repository name; messages from different repositories can alternate between complete blocks. Quiet output and color controls remain unchanged.
 
 ## Runtime Behavior
 
@@ -220,6 +235,8 @@ If submodule initialization fails (for example, due to a network error fetching 
 ### Quiet Default
 
 By default, **ghorgsync** only prints:
+
+- **Worker limit:** `workers: N` at startup
 
 - **Actions taken:** cloned, updated, branch checkout/pull
 - **Findings:** dirty repos, branch drift, unknown folders, excluded-but-present, collisions, errors
