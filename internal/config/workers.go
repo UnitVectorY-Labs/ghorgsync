@@ -6,6 +6,8 @@ import (
 	"strconv"
 )
 
+const maxDefaultWorkers = 32
+
 // ResolveWorkers selects the repository concurrency. An explicit flag overrides
 // the environment, including an invalid environment value.
 func ResolveWorkers(flagValue, envValue string, flagSet bool) (int, error) {
@@ -13,7 +15,11 @@ func ResolveWorkers(flagValue, envValue string, flagSet bool) (int, error) {
 	if flagSet {
 		value, source = flagValue, "--workers"
 	} else if value == "" {
-		return 4 * runtime.NumCPU(), nil
+		workerCount := 4 * runtime.NumCPU()
+		if workerCount > maxDefaultWorkers {
+			workerCount = maxDefaultWorkers
+		}
+		return workerCount, nil
 	}
 	workerCount, err := strconv.Atoi(value)
 	if err != nil || workerCount < 1 {

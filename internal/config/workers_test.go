@@ -12,7 +12,7 @@ func TestResolveWorkers(t *testing.T) {
 		want            int
 		fail            bool
 	}{
-		{name: "four workers per CPU thread", want: 4 * runtime.NumCPU()},
+		{name: "four workers per CPU thread capped at 32", want: min(4*runtime.NumCPU(), maxDefaultWorkers)},
 		{name: "environment", env: "8", want: 8},
 		{name: "flag wins", flag: "3", env: "8", set: true, want: 3},
 		{name: "flag overrides invalid environment", flag: "1", env: "bad", set: true, want: 1},
