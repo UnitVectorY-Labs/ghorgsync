@@ -72,7 +72,7 @@ func run() (exitCode int) {
 	flag.Var(&verbosity, "verbose", "Enable verbose output; repeat (--verbose --verbose) for trace-level detail including raw command output and API response bodies")
 	noColorFlag := flag.Bool("no-color", false, "Disable color output")
 	noProgressFlag := flag.Bool("no-progress", false, "Suppress the live progress bar (useful for scripting, CI, and when output is consumed by another program)")
-	workersFlag := flag.String("workers", "", "Maximum concurrent repositories (GHORGSYNC_WORKERS; default: 4 times logical CPU count; 1 for sequential processing)")
+	workersFlag := flag.String("workers", "", "Maximum concurrent repositories (GHORGSYNC_WORKERS; default: 4 times logical CPU count, capped at 32; 1 for sequential processing)")
 	cloneOnlyFlag := flag.Bool("clone", false, "Only clone missing repositories (skip processing existing repos)")
 	statusFlag := flag.Bool("status", false, "Show status of repositories (dirty repos and branch drift only)")
 	cleanFlag := flag.Bool("clean", false, "Remove git-ignored files and directories after syncing (asks for confirmation)")

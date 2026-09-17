@@ -20,7 +20,7 @@ permalink: /examples
 
 ### Tune Parallel Processing
 
-The default concurrency is four times the number of logical CPUs on the machine. Override it for a single run:
+The default concurrency is four times the number of logical CPUs on the machine, capped at 32 workers. Override it for a single run:
 
 ```bash
 ghorgsync --workers 4
