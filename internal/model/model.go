@@ -1,6 +1,7 @@
 package model
 
 // RepoInfo represents a GitHub repository from the org inventory.
+// IsPrivate includes both private and internal visibility.
 type RepoInfo struct {
 	Name          string
 	CloneURL      string

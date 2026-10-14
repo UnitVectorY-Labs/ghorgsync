@@ -29,7 +29,7 @@ permalink: /usage
 | `auth_user` | string | — | GitHub CLI username to authenticate as on github.com |
 | `auth_switch_back` | boolean | `false` | Restore the previous CLI account after a switch; requires `auth_user` |
 | `include_public` | boolean | `true` | Include public repositories |
-| `include_private` | boolean | `true` | Include private repositories |
+| `include_private` | boolean | `true` | Include private and internal repositories |
 | `include_archived` | boolean | `false` | Include archived repositories |
 | `exclude_repos` | array | `[]` | Repository names or regex patterns to exclude |
 
@@ -311,6 +311,12 @@ A GitHub repository that has never had any commits pushed to it is considered *e
 Empty repositories are silently skipped — they are not cloned, not synced, and do not count towards the total. When one or more empty repositories are encountered, the final summary line includes an `empty: N` counter. No local action is taken for empty repositories.
 
 This detection requires at most one additional API call per zero-size repository; repositories with a non-zero size need no extra calls.
+
+## Organization Visibility
+
+Organization discovery requests `GET /orgs/{organization}/repos?type=all` and follows pagination to retrieve all repositories accessible to the current credentials. GitHub's `visibility` metadata distinguishes public, private, and internal repositories. Internal repositories are included by default and use the `include_private` setting: `include_private: false` excludes both private and internal repositories, while `include_public: false` keeps private and internal repositories. The legacy `private` flag is also honored when visibility metadata is absent.
+
+Internal visibility is available only to organizations associated with a GitHub enterprise. Credentials must have access to the repositories; ghorgsync cannot discover repositories that GitHub omits for the current token. Empty internal repositories follow the same empty-repository skipping rules described above.
 
 ## User Mode and Private Repositories
 

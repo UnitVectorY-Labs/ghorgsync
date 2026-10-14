@@ -92,7 +92,7 @@ func (c *Config) ShouldIncludePublic() bool {
 	return c.IncludePublic == nil || *c.IncludePublic
 }
 
-// ShouldIncludePrivate returns true if private repositories should be included.
+// ShouldIncludePrivate returns true if private and internal repositories should be included.
 // Defaults to true when not explicitly set.
 func (c *Config) ShouldIncludePrivate() bool {
 	return c.IncludePrivate == nil || *c.IncludePrivate

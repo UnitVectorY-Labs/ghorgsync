@@ -38,7 +38,7 @@ The last command processes repositories sequentially even though the environment
 
 ### Basic Organization Configuration
 
-Sync all repositories (public and private) in an organization:
+Sync all accessible repositories (public, private, and internal) in an organization:
 
 ```yaml
 organization: my-org
@@ -73,7 +73,7 @@ Unset `GH_TOKEN` and `GITHUB_TOKEN` when using `auth_user`. See [Multiple GitHub
 
 ### Public Repositories Only
 
-Exclude private repositories from syncing:
+Exclude private and internal repositories from syncing:
 
 ```yaml
 organization: my-org

@@ -69,8 +69,21 @@ type ghRepo struct {
 	CloneURL      string `json:"clone_url"`
 	DefaultBranch string `json:"default_branch"`
 	Private       bool   `json:"private"`
+	Visibility    string `json:"visibility"`
 	Archived      bool   `json:"archived"`
 	Size          *int   `json:"size"`
+}
+
+// repoInfo treats internal repositories as non-public for visibility filtering.
+// Retain the legacy private flag when visibility is absent.
+func (r ghRepo) repoInfo() model.RepoInfo {
+	return model.RepoInfo{
+		Name:          r.Name,
+		CloneURL:      r.CloneURL,
+		DefaultBranch: r.DefaultBranch,
+		IsPrivate:     r.Private || r.Visibility == "private" || r.Visibility == "internal",
+		IsArchived:    r.Archived,
+	}
 }
 
 // listRepos fetches all repositories from the given paginated GitHub API URL.
@@ -115,13 +128,7 @@ func (c *Client) listRepos(url string) ([]model.RepoInfo, error) {
 		}
 
 		for _, r := range page {
-			repo := model.RepoInfo{
-				Name:          r.Name,
-				CloneURL:      r.CloneURL,
-				DefaultBranch: r.DefaultBranch,
-				IsPrivate:     r.Private,
-				IsArchived:    r.Archived,
-			}
+			repo := r.repoInfo()
 			// A non-zero size guarantees git history. A zero (or missing) size
 			// is ambiguous: size is in KB and truncates, so a repo initialized
 			// at creation with just a README also reports 0, and
@@ -216,7 +223,7 @@ func sanitizeRequestURL(rawURL string) string {
 
 // ListOrgRepos lists all repositories for the given organisation.
 func (c *Client) ListOrgRepos(org string) ([]model.RepoInfo, error) {
-	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?per_page=100&page=1", org)
+	url := fmt.Sprintf("https://api.github.com/orgs/%s/repos?type=all&per_page=100&page=1", org)
 	return c.listRepos(url)
 }
 
