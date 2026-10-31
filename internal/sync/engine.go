@@ -15,12 +15,17 @@ type Engine struct {
 
 // NewEngine creates a new sync engine.
 // verbosity controls logging: 0=quiet, 1=verbose (cmd/exit), 2=trace (also raw output).
-func NewEngine(baseDir string, verbosity int, logf func(string, ...any), tracef func(string, ...any)) *Engine {
-	var inner GitRunner
-	if verbosity >= 2 && tracef != nil {
-		inner = &ExecGitRunner{tracef: tracef}
-	} else {
-		inner = &ExecGitRunner{}
+func NewEngine(baseDir string, verbosity int, logf func(string, ...any), tracef func(string, ...any), options ...GitOptions) *Engine {
+	settings := GitOptions{}
+	if len(options) > 0 {
+		settings = options[0]
+	}
+	inner := &ExecGitRunner{options: settings}
+	if verbosity >= 2 {
+		inner.tracef = tracef
+	}
+	if verbosity >= 1 {
+		inner.logf = logf
 	}
 
 	var gitRunner GitRunner = inner
@@ -99,7 +104,12 @@ func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 		result.Action = model.ActionDirty
 		result.DirtyFiles = files
 		// Get diff stats
-		adds, dels, _ := e.Git.DiffStats(repoDir)
+		adds, dels, err := e.Git.DiffStats(repoDir)
+		if commandInterrupted(err) {
+			result.Action = model.ActionFetchError
+			result.Error = err
+			return result
+		}
 		result.Additions = adds
 		result.Deletions = dels
 		return result
@@ -124,9 +134,13 @@ func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 	}
 
 	// Update submodule pointers after pull to keep them in sync with the new commits.
-	// This is non-fatal: if submodule update fails after a successful pull, we still
-	// report the pull result and the error will surface on the next sync cycle.
-	_ = e.Git.SubmoduleUpdate(repoDir)
+	// Report failures, including inactivity timeouts, even after a successful pull.
+	if err := e.Git.SubmoduleUpdate(repoDir); err != nil {
+		result.Action = model.ActionSubmoduleError
+		result.Error = err
+		result.Updated = changed
+		return result
+	}
 
 	result.Updated = changed
 
@@ -181,7 +195,12 @@ func (e *Engine) StatusRepo(repo model.RepoInfo) model.RepoResult {
 		result.DirtyFiles = files
 		// Get colorized status output for display; non-fatal if unavailable
 		// since the dirty state is already captured in DirtyFiles.
-		statusOut, _ := e.Git.StatusShort(repoDir)
+		statusOut, err := e.Git.StatusShort(repoDir)
+		if commandInterrupted(err) {
+			result.Action = model.ActionFetchError
+			result.Error = err
+			return result
+		}
 		result.StatusOutput = statusOut
 		return result
 	}

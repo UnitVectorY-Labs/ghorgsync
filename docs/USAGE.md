@@ -83,6 +83,7 @@ ghorgsync [flags]
 | `--no-color` | Disable color output |
 | `--no-progress` | Suppress the live progress bar. Action and finding output is still printed; only the re-drawn `%` progress lines are omitted. Useful for scripting, CI pipelines, and when the tool's output is consumed by another program or redirected to a file. |
 | `--workers N` | Maximum repositories processed concurrently. Defaults to four times the number of logical CPUs reported by Go, capped at 32. Overrides `GHORGSYNC_WORKERS`; use `1` for sequential processing. Must be a positive integer. `--clean` always runs sequentially. |
+| `--git-idle-timeout DURATION` | Cancel a Git command after this long without stdout/stderr activity. Overrides `GHORGSYNC_GIT_IDLE_TIMEOUT`. Defaults to `2m` without output. Use `0` to disable automatic cancellation. |
 | `--clone` | Clone-only mode: only clone missing repositories (see [Clone-Only Mode](#clone-only-mode)) |
 | `--status` | Status mode: show only dirty repos and branch drift (see [Status Mode](#status-mode)) |
 | `--clean` | After each repository's normal sync work, remove its Git-ignored files and directories (see [Ignored Content Cleanup](#ignored-content-cleanup)). Prompts for confirmation unless `--force` is supplied. |
@@ -106,6 +107,49 @@ The limit applies to default sync, `--clone`, and `--status`. Missing repositori
 Parallelism can overlap network waits; the best setting also depends on disk speed, bandwidth, repository sizes, and remote performance. Lower the limit if simultaneous clones or updates contend for those resources. `--verbose` reports discovery and scan times, each repository's processing time, and total elapsed time. Per-repository times overlap and should not be summed as wall-clock runtime.
 
 Results appear in completion order when parallelism is enabled. Summary counts are accumulated serially, and progress advances once per completed repository. Complete output messages (including multiline dirty reports and trace blocks) and progress clear/redraw operations share a lock, preventing interleaved messages or conflicting redraws. Verbose and trace diagnostics carry the repository name; messages from different repositories can alternate between complete blocks. Quiet output and color controls remain unchanged.
+
+### Git Output Inactivity
+
+By default, a Git command is cancelled after **two minutes without output**.
+No flag is needed to enable this protection. Customize the limit with
+`--git-idle-timeout 5m` or `GHORGSYNC_GIT_IDLE_TIMEOUT=5m`, or disable it with
+`--git-idle-timeout 0`. Two minutes is a practical default, not a guarantee that
+silent work has stalled. Values use Go duration syntax (`90s`, `2m`, `1h`);
+negative or invalid values fail before
+authentication. An explicit flag overrides the environment, including `0` to
+disable the default or an environment setting. The startup dotfile gate still takes precedence.
+
+The limit is per Git command, including local commands and status mode. It starts
+when the command is launched and restarts whenever stdout or stderr produces
+bytes, including partial lines and carriage-return progress. Network operations
+request Git progress output even when captured. There is no maximum total runtime:
+a command that continues producing output can run indefinitely. Progress is
+captured internally, preserving quiet default output.
+
+**Output activity is a heuristic, not proof of progress.** Git can legitimately
+work silently, and repeated messages can keep a stalled operation alive. Choose a
+limit appropriate for your workload, or disable automatic cancellation with `0`.
+
+With `--verbose`, active commands report the repository, operation, elapsed time,
+and time without output every 30 seconds. Repeating `--verbose` streams raw output
+as it arrives, rather than waiting for completion. These diagnostics are available
+with automatic cancellation disabled too. Raw trace output is streamed in full; buffered error diagnostics retain only the
+last 64 KiB per command. Machine-readable stdout is not truncated.
+
+On inactivity expiry, the command and its contained helpers are terminated and Git
+is reaped. Linux and macOS use a dedicated process group; Windows uses a Job Object,
+with Git suspended until it joins the job. These containment mechanisms cover
+normal Git descendants; independently launched external services are outside their
+scope. Pipe waits after process exit are bounded to two seconds. Ctrl+C cancels
+active Git operations through the same mechanism and the command exits unsuccessfully.
+
+A timeout is reported with the repository's existing error category (such as
+`fetch-error`), operation, elapsed time, inactivity duration, and configured limit.
+Other repositories continue and the summary completes. Operational repository
+errors result in exit code `1`; status summaries include an error count when nonzero. Errors updating submodules
+after a successful pull are also reported. No automatic retry, directory removal,
+local-change discard, or lock-file deletion is performed. A cancelled clone may
+leave a partial directory that needs manual inspection before the next run.
 
 ## Runtime Behavior
 
@@ -258,7 +302,7 @@ Use `--verbose` to emit diagnostic details about runtime operations, including:
 
 Repeat the flag (`--verbose --verbose`) to enable **trace-level** output, which additionally includes:
 
-- Raw git command output (stdout/stderr from every git invocation, when non-empty)
+- Live raw git command output (stdout/stderr from every git invocation, when non-empty)
 - Full GitHub API response bodies
 
 Authentication secrets are never printed in verbose or trace output. Authorization tokens are not logged, and sensitive URL query parameters are redacted.
