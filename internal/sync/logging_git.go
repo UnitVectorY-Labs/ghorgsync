@@ -25,7 +25,7 @@ func NewLoggingGitRunner(next GitRunner, logf func(string, ...any)) GitRunner {
 }
 
 func (g *LoggingGitRunner) Clone(url, dest string) error {
-	g.logf("git cmd: git clone --recurse-submodules %s %s", url, dest)
+	g.logf("git cmd: git clone --recurse-submodules %s %s --progress", url, dest)
 	if err := g.next.Clone(url, dest); err != nil {
 		g.logf("git exit: 1 error=%q", err.Error())
 		return err
@@ -35,7 +35,7 @@ func (g *LoggingGitRunner) Clone(url, dest string) error {
 }
 
 func (g *LoggingGitRunner) Fetch(repoDir string) error {
-	g.logf("git cmd: git -C %s fetch --all --prune", repoDir)
+	g.logf("git cmd: git -C %s fetch --all --prune --progress", repoDir)
 	if err := g.next.Fetch(repoDir); err != nil {
 		g.logf("git exit: 1 error=%q", err.Error())
 		return err
@@ -45,7 +45,7 @@ func (g *LoggingGitRunner) Fetch(repoDir string) error {
 }
 
 func (g *LoggingGitRunner) SubmoduleUpdate(repoDir string) error {
-	g.logf("git cmd: git -C %s submodule update --init --recursive", repoDir)
+	g.logf("git cmd: git -C %s submodule update --init --recursive --progress", repoDir)
 	if err := g.next.SubmoduleUpdate(repoDir); err != nil {
 		g.logf("git exit: 1 error=%q", err.Error())
 		return err
@@ -99,7 +99,7 @@ func (g *LoggingGitRunner) Checkout(repoDir, branch string) error {
 }
 
 func (g *LoggingGitRunner) PullFF(repoDir string) (bool, error) {
-	g.logf("git cmd: git -C %s pull --ff-only", repoDir)
+	g.logf("git cmd: git -C %s pull --ff-only --progress", repoDir)
 	updated, err := g.next.PullFF(repoDir)
 	if err != nil {
 		g.logf("git exit: 1 error=%q", err.Error())

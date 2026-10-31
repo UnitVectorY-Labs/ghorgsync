@@ -27,7 +27,9 @@ type GitRunner interface {
 // ExecGitRunner runs real git commands.
 // When tracef is set, the raw output of each command is forwarded to it.
 type ExecGitRunner struct {
-	tracef func(string, ...any)
+	tracef  func(string, ...any)
+	logf    func(string, ...any)
+	options GitOptions
 }
 
 func (g *ExecGitRunner) tracefSafe(format string, args ...any) {
@@ -37,11 +39,8 @@ func (g *ExecGitRunner) tracefSafe(format string, args ...any) {
 }
 
 func (g *ExecGitRunner) Clone(url, dest string) error {
-	cmd := exec.Command("git", "clone", "--recurse-submodules", url, dest)
-	out, err := cmd.CombinedOutput()
-	if s := strings.TrimSpace(string(out)); s != "" {
-		g.tracefSafe("git output:\n%s", s)
-	}
+	cmd := exec.Command("git", "clone", "--recurse-submodules", url, dest, "--progress")
+	out, err := g.run(cmd, true)
 	if err != nil {
 		return fmt.Errorf("git clone: %s: %w", strings.TrimSpace(string(out)), err)
 	}
@@ -49,11 +48,8 @@ func (g *ExecGitRunner) Clone(url, dest string) error {
 }
 
 func (g *ExecGitRunner) Fetch(repoDir string) error {
-	cmd := exec.Command("git", "-C", repoDir, "fetch", "--all", "--prune")
-	out, err := cmd.CombinedOutput()
-	if s := strings.TrimSpace(string(out)); s != "" {
-		g.tracefSafe("git output:\n%s", s)
-	}
+	cmd := exec.Command("git", "-C", repoDir, "fetch", "--all", "--prune", "--progress")
+	out, err := g.run(cmd, true)
 	if err != nil {
 		return fmt.Errorf("git fetch: %s: %w", strings.TrimSpace(string(out)), err)
 	}
@@ -61,11 +57,8 @@ func (g *ExecGitRunner) Fetch(repoDir string) error {
 }
 
 func (g *ExecGitRunner) SubmoduleUpdate(repoDir string) error {
-	cmd := exec.Command("git", "-C", repoDir, "submodule", "update", "--init", "--recursive")
-	out, err := cmd.CombinedOutput()
-	if s := strings.TrimSpace(string(out)); s != "" {
-		g.tracefSafe("git output:\n%s", s)
-	}
+	cmd := exec.Command("git", "-C", repoDir, "submodule", "update", "--init", "--recursive", "--progress")
+	out, err := g.run(cmd, true)
 	if err != nil {
 		return fmt.Errorf("git submodule update: %s: %w", strings.TrimSpace(string(out)), err)
 	}
@@ -74,24 +67,20 @@ func (g *ExecGitRunner) SubmoduleUpdate(repoDir string) error {
 
 func (g *ExecGitRunner) CurrentBranch(repoDir string) (string, error) {
 	cmd := exec.Command("git", "-C", repoDir, "rev-parse", "--abbrev-ref", "HEAD")
-	out, err := cmd.Output()
+	out, err := g.run(cmd, false)
 	if err != nil {
 		return "", fmt.Errorf("git current branch: %w", err)
 	}
 	branch := strings.TrimSpace(string(out))
-	g.tracefSafe("git output: %s", branch)
 	return branch, nil
 }
 
 func (g *ExecGitRunner) IsDirty(repoDir string) (bool, []model.DirtyFile, error) {
 	// Use git status --porcelain to detect dirty state
 	cmd := exec.Command("git", "-C", repoDir, "status", "--porcelain")
-	out, err := cmd.Output()
+	out, err := g.run(cmd, false)
 	if err != nil {
 		return false, nil, fmt.Errorf("git status: %w", err)
-	}
-	if s := strings.TrimSpace(string(out)); s != "" {
-		g.tracefSafe("git output:\n%s", s)
 	}
 	files := ParseGitStatus(string(out))
 	if len(files) == 0 {
@@ -103,23 +92,17 @@ func (g *ExecGitRunner) IsDirty(repoDir string) (bool, []model.DirtyFile, error)
 func (g *ExecGitRunner) DiffStats(repoDir string) (int, int, error) {
 	// Staged changes
 	cmd := exec.Command("git", "-C", repoDir, "diff", "--cached", "--numstat")
-	out, err := cmd.Output()
+	out, err := g.run(cmd, false)
 	if err != nil {
-		return 0, 0, nil // non-fatal
-	}
-	if s := strings.TrimSpace(string(out)); s != "" {
-		g.tracefSafe("git output:\n%s", s)
+		return 0, 0, err
 	}
 	adds, dels := parseNumstat(string(out))
 
 	// Unstaged changes
 	cmd2 := exec.Command("git", "-C", repoDir, "diff", "--numstat")
-	out2, err := cmd2.Output()
+	out2, err := g.run(cmd2, false)
 	if err != nil {
-		return adds, dels, nil
-	}
-	if s := strings.TrimSpace(string(out2)); s != "" {
-		g.tracefSafe("git output:\n%s", s)
+		return adds, dels, err
 	}
 	a2, d2 := parseNumstat(string(out2))
 	return adds + a2, dels + d2, nil
@@ -152,10 +135,7 @@ func parseNumstat(output string) (int, int) {
 
 func (g *ExecGitRunner) Checkout(repoDir, branch string) error {
 	cmd := exec.Command("git", "-C", repoDir, "checkout", branch)
-	out, err := cmd.CombinedOutput()
-	if s := strings.TrimSpace(string(out)); s != "" {
-		g.tracefSafe("git output:\n%s", s)
-	}
+	out, err := g.run(cmd, true)
 	if err != nil {
 		return fmt.Errorf("git checkout %s: %s: %w", branch, strings.TrimSpace(string(out)), err)
 	}
@@ -164,46 +144,48 @@ func (g *ExecGitRunner) Checkout(repoDir, branch string) error {
 
 func (g *ExecGitRunner) PullFF(repoDir string) (bool, error) {
 	// Get current HEAD before pull
-	headBefore := getHead(repoDir)
-
-	cmd := exec.Command("git", "-C", repoDir, "pull", "--ff-only")
-	out, err := cmd.CombinedOutput()
-	if s := strings.TrimSpace(string(out)); s != "" {
-		g.tracefSafe("git output:\n%s", s)
+	headBefore, err := g.getHead(repoDir)
+	if err != nil {
+		return false, err
 	}
+
+	cmd := exec.Command("git", "-C", repoDir, "pull", "--ff-only", "--progress")
+	out, err := g.run(cmd, true)
 	if err != nil {
 		return false, fmt.Errorf("git pull --ff-only: %s: %w", strings.TrimSpace(string(out)), err)
 	}
 
-	headAfter := getHead(repoDir)
+	headAfter, err := g.getHead(repoDir)
+	if err != nil {
+		return false, err
+	}
 	return headBefore != headAfter, nil
 }
 
-func getHead(repoDir string) string {
+func (g *ExecGitRunner) getHead(repoDir string) (string, error) {
 	cmd := exec.Command("git", "-C", repoDir, "rev-parse", "HEAD")
-	out, _ := cmd.Output()
-	return strings.TrimSpace(string(out))
+	out, err := g.run(cmd, false)
+	if err != nil {
+		return "", fmt.Errorf("git rev-parse HEAD: %w", err)
+	}
+	return strings.TrimSpace(string(out)), nil
 }
 
 func (g *ExecGitRunner) RemoteURL(repoDir string) (string, error) {
 	cmd := exec.Command("git", "-C", repoDir, "remote", "get-url", "origin")
-	out, err := cmd.Output()
+	out, err := g.run(cmd, false)
 	if err != nil {
 		return "", fmt.Errorf("git remote get-url: %w", err)
 	}
 	remote := strings.TrimSpace(string(out))
-	g.tracefSafe("git output: %s", remote)
 	return remote, nil
 }
 
 func (g *ExecGitRunner) StatusShort(repoDir string) (string, error) {
 	cmd := exec.Command("git", "-C", repoDir, "-c", "color.status=always", "status", "--short")
-	out, err := cmd.Output()
+	out, err := g.run(cmd, false)
 	if err != nil {
 		return "", fmt.Errorf("git status: %w", err)
-	}
-	if s := strings.TrimSpace(string(out)); s != "" {
-		g.tracefSafe("git output:\n%s", s)
 	}
 	return string(out), nil
 }
@@ -212,7 +194,7 @@ func (g *ExecGitRunner) StatusShort(repoDir string) (string, error) {
 // paths containing newlines are handled correctly.
 func (g *ExecGitRunner) IgnoredPaths(repoDir string) ([]string, error) {
 	cmd := exec.Command("git", "-C", repoDir, "ls-files", "-z", "--others", "--ignored", "--exclude-standard")
-	out, err := cmd.Output()
+	out, err := g.run(cmd, false)
 	if err != nil {
 		return nil, fmt.Errorf("git ls-files ignored: %w", err)
 	}

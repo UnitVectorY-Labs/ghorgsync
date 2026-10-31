@@ -533,7 +533,7 @@ func (p *Printer) RepoStatusBranchDrift(name, currentBranch, defaultBranch strin
 }
 
 // StatusSummary prints the summary line for status mode.
-func (p *Printer) StatusSummary(total, dirty, branchDrift int) {
+func (p *Printer) StatusSummary(total, dirty, branchDrift, errors int) {
 	p.withProgressSuspended(func() {
 		fmt.Println()
 		fmt.Println(p.colorize(bold, "Summary:"))
@@ -551,6 +551,9 @@ func (p *Printer) StatusSummary(total, dirty, branchDrift int) {
 			parts = append(parts, p.colorize(yellow, fmt.Sprintf("branch-drift: %d", branchDrift)))
 		} else {
 			parts = append(parts, fmt.Sprintf("branch-drift: %d", branchDrift))
+		}
+		if errors > 0 {
+			parts = append(parts, p.colorize(red, fmt.Sprintf("errors: %d", errors)))
 		}
 
 		fmt.Println("  " + strings.Join(parts, " | "))

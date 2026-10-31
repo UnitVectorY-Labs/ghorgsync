@@ -1,14 +1,17 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"regexp"
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/cleanup"
@@ -73,6 +76,7 @@ func run() (exitCode int) {
 	noColorFlag := flag.Bool("no-color", false, "Disable color output")
 	noProgressFlag := flag.Bool("no-progress", false, "Suppress the live progress bar (useful for scripting, CI, and when output is consumed by another program)")
 	workersFlag := flag.String("workers", "", "Maximum concurrent repositories (GHORGSYNC_WORKERS; default: 4 times logical CPU count, capped at 32; 1 for sequential processing)")
+	gitIdleTimeoutFlag := flag.String("git-idle-timeout", "", "Cancel Git after this duration without output (GHORGSYNC_GIT_IDLE_TIMEOUT; default: 2m; 0 disables)")
 	cloneOnlyFlag := flag.Bool("clone", false, "Only clone missing repositories (skip processing existing repos)")
 	statusFlag := flag.Bool("status", false, "Show status of repositories (dirty repos and branch drift only)")
 	cleanFlag := flag.Bool("clean", false, "Remove git-ignored files and directories after syncing (asks for confirmation)")
@@ -122,7 +126,11 @@ func run() (exitCode int) {
 
 	// Load and validate config
 	workersSet := false
+	gitIdleTimeoutSet := false
 	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "git-idle-timeout" {
+			gitIdleTimeoutSet = true
+		}
 		if f.Name == "workers" {
 			workersSet = true
 		}
@@ -132,6 +140,14 @@ func run() (exitCode int) {
 		printer.ConfigError(err)
 		return 1
 	}
+	idleTimeout, err := config.ResolveGitIdleTimeout(*gitIdleTimeoutFlag, os.Getenv("GHORGSYNC_GIT_IDLE_TIMEOUT"), gitIdleTimeoutSet)
+	if err != nil {
+		printer.ConfigError(err)
+		return 1
+	}
+	ctx, stopSignals := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stopSignals()
+	gitOptions := sync.GitOptions{Context: ctx, IdleTimeout: idleTimeout}
 	// Cleanup includes interactive prompts and must finish before the next repo.
 	if *cleanFlag {
 		workerCount = 1
@@ -211,7 +227,7 @@ func run() (exitCode int) {
 
 	// Create sync engine
 	printer.Verbose("directory scan elapsed: %s", time.Since(scanStarted).Round(time.Millisecond))
-	eng := sync.NewEngine(dir, int(verbosity), printer.Verbose, printer.Trace)
+	eng := sync.NewEngine(dir, int(verbosity), printer.Verbose, printer.Trace, gitOptions)
 
 	// Build lookup map from repo name → RepoInfo
 	repoMap := make(map[string]model.RepoInfo, len(included))
@@ -231,7 +247,7 @@ func run() (exitCode int) {
 		runRepoWorkers(scanResult.ManagedMissing, repoMap, workerCount, dir, int(verbosity), printer, (*sync.Engine).CloneRepo, func(result model.RepoResult) {
 			handleResult(printer, result, &summary)
 			printer.AdvanceRepoProgress()
-		})
+		}, gitOptions)
 
 		printer.FinishRepoProgress()
 	} else if *statusFlag {
@@ -251,11 +267,14 @@ func run() (exitCode int) {
 				summary.Errors++
 			}
 			printer.AdvanceRepoProgress()
-		})
+		}, gitOptions)
 
 		printer.FinishRepoProgress()
 
-		printer.StatusSummary(summary.TotalRepos, summary.Dirty, summary.BranchDrift)
+		printer.StatusSummary(summary.TotalRepos, summary.Dirty, summary.BranchDrift, summary.Errors)
+		if ctx.Err() != nil || summary.Errors > 0 {
+			return 1
+		}
 		return 0
 	} else {
 		// Default mode: full sync
@@ -272,7 +291,7 @@ func run() (exitCode int) {
 				cleanRepoIgnoredContent(eng, dir, result.Name, printer, *forceFlag, *dryRunFlag, &summary)
 			}
 			printer.AdvanceRepoProgress()
-		})
+		}, gitOptions)
 
 		// Process existing repos
 		runRepoWorkers(scanResult.ManagedFound, repoMap, workerCount, dir, int(verbosity), printer, (*sync.Engine).ProcessRepo, func(result model.RepoResult) {
@@ -281,7 +300,7 @@ func run() (exitCode int) {
 				cleanRepoIgnoredContent(eng, dir, result.Name, printer, *forceFlag, *dryRunFlag, &summary)
 			}
 			printer.AdvanceRepoProgress()
-		})
+		}, gitOptions)
 
 		printer.FinishRepoProgress()
 
@@ -314,12 +333,15 @@ func run() (exitCode int) {
 		summary.Errors,
 		summary.Empty,
 	)
+	if ctx.Err() != nil || summary.Errors > 0 {
+		return 1
+	}
 	return 0
 }
 
 // Each repository gets its own diagnostics context. Only the serial consumer
 // updates summaries; the printer serializes worker diagnostics with results.
-func runRepoWorkers(names []string, repos map[string]model.RepoInfo, workerCount int, baseDir string, verbosity int, printer *output.Printer, operation func(*sync.Engine, model.RepoInfo) model.RepoResult, consume func(model.RepoResult)) {
+func runRepoWorkers(names []string, repos map[string]model.RepoInfo, workerCount int, baseDir string, verbosity int, printer *output.Printer, operation func(*sync.Engine, model.RepoInfo) model.RepoResult, consume func(model.RepoResult), options ...sync.GitOptions) {
 	sync.RunWorkers(names, workerCount, func(name string) model.RepoResult {
 		logf := func(format string, args ...any) {
 			printer.Verbose("repo %s: %s", name, fmt.Sprintf(format, args...))
@@ -327,7 +349,7 @@ func runRepoWorkers(names []string, repos map[string]model.RepoInfo, workerCount
 		tracef := func(format string, args ...any) {
 			printer.Trace("repo %s: %s", name, fmt.Sprintf(format, args...))
 		}
-		eng := sync.NewEngine(baseDir, verbosity, logf, tracef)
+		eng := sync.NewEngine(baseDir, verbosity, logf, tracef, options...)
 		started := time.Now()
 		result := operation(eng, repos[name])
 		logf("completed in %s", time.Since(started).Round(time.Millisecond))

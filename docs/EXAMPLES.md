@@ -395,3 +395,32 @@ If a submodule remote is unreachable, the repository is reported as a `submodule
 ```
 
 Fix the underlying submodule remote issue (network access, SSH keys, token scope) and re-run.
+
+## Diagnosing Git Waits
+
+Show each active operation's elapsed time and time without output every 30 seconds.
+The default two-minute inactivity watchdog remains enabled:
+
+```bash
+ghorgsync --verbose
+```
+
+Stream raw Git output as it arrives:
+
+```bash
+ghorgsync --verbose --verbose
+```
+
+Allow five minutes without output instead of the default two minutes:
+
+```bash
+ghorgsync --git-idle-timeout 5m --verbose
+```
+
+Output restarts the inactivity timer, so a progressing command can run for hours.
+Silent work can still be legitimate; see [Git Output Inactivity](usage#git-output-inactivity).
+To disable the default watchdog or a timeout set in the environment for one run:
+
+```bash
+ghorgsync --git-idle-timeout 0
+```
