@@ -1,7 +1,7 @@
 package github
 
 import (
-	"encoding/json"
+	"encoding/json/v2"
 	"testing"
 
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/config"
@@ -55,6 +55,30 @@ func TestRepositoryVisibilityFiltering(t *testing.T) {
 				})
 			}
 		})
+	}
+}
+
+func TestRepositoryJSONDefaults(t *testing.T) {
+	for _, tt := range []struct {
+		name string
+		data string
+	}{
+		{"duplicate keys", `{"name":"repo","private":false,"private":true}`},
+		{"invalid UTF-8", "{\"name\":\"repo\xff\"}"},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			var repo ghRepo
+			if err := json.Unmarshal([]byte(tt.data), &repo); err == nil {
+				t.Fatal("expected invalid JSON to be rejected")
+			}
+		})
+	}
+	var repo ghRepo
+	if err := json.Unmarshal([]byte(`{"Name":"ignored","private":true,"extra":"ignored"}`), &repo); err != nil {
+		t.Fatal(err)
+	}
+	if repo.Name != "" || !repo.Private {
+		t.Fatalf("unexpected repository metadata: %+v", repo)
 	}
 }
 
