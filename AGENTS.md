@@ -4,6 +4,7 @@ This is a Go based command line application the follows idiomatic Go conventions
 
 ## Repo Conventions For The Agent
 - Treat `docs/` as required source of truth alongside code. When behavior changes, update the matching doc pages in the same PR.
+- Put documentation changes in the existing section or page that owns the topic. Do not append standalone feature notes or implementation commentary to the root README or unrelated pages; keep the root README focused on its existing overview and quick-start scope.
 - Keep dependencies minimal and prefer stdlib. Add third-party packages only when they materially improve correctness or output quality.
 
 ## Application Behavior That Must Not Drift
