@@ -55,4 +55,4 @@ Working with many repositories across a GitHub organization or user account mean
    ghorgsync
    ```
 
-Archived local clones can be removed explicitly with `--delete-archived`; preview with `--delete-archived --dry-run`. Tracked changes, non-ignored untracked files, and unpublished history prevent deletion; ignored content is removed with the clone. See [usage documentation](docs/USAGE.md#archived-repositories).
+Archived local clones can be removed explicitly with `--delete-archived`; preview with `--delete-archived --dry-run`. Deletion is non-interactive. Tracked changes, non-ignored untracked files, and unpublished history prevent deletion unless `--force` is supplied; ignored content is removed with the clone. See [usage documentation](docs/USAGE.md#archived-repositories).

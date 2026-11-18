@@ -8,10 +8,11 @@ This is a Go based command line application the follows idiomatic Go conventions
 
 ## Application Behavior That Must Not Drift
 
+- The CLI must be non-interactive: never prompt for confirmation or read stdin. Explicit flags authorize actions; `--dry-run` previews them. `--delete-archived --force` overrides local content/history protection but never repository identity or path safeguards.
 - Startup gate: only run when a repo-root dotfile named after the executable exists (for example `.ghorgsync`). If missing, emit a short message and exit successfully without doing anything else.
 - Non-destructive rules (hard constraints):
-  - never delete directories by default; explicit `--clean` may remove only ignored content, and explicit `--delete-archived` may remove verified archived clones after confirmation (or `--force`)
-  - never discard local changes; archived deletion must reject tracked changes, non-ignored untracked files, and unpublished history; ignored content may be deleted with an eligible archived clone
+  - never delete directories by default; explicit `--clean` may remove only ignored content, and explicit `--delete-archived` may remove verified archived clones without prompting
+  - never discard local changes; archived deletion must retain tracked changes, non-ignored untracked files, and unpublished history unless `--force` explicitly authorizes their deletion; ignored content may be deleted with an eligible archived clone
   - never run destructive git commands (no `reset --hard`, no `clean -fd`, no force checkout)
 - Default branch is per-repository and must be sourced from GitHub metadata, not assumed.
 - Decision rules per repository:

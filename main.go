@@ -76,9 +76,9 @@ func run() (exitCode int) {
 	workersFlag := flag.String("workers", "", "Maximum concurrent repositories (GHORGSYNC_WORKERS; default: 4 times logical CPU count, capped at 32; 1 for sequential processing)")
 	cloneOnlyFlag := flag.Bool("clone", false, "Only clone missing repositories (skip processing existing repos)")
 	statusFlag := flag.Bool("status", false, "Show status of repositories (dirty repos and branch drift only)")
-	deleteArchivedFlag := flag.Bool("delete-archived", false, "Delete safely verified local clones excluded because they are archived (asks for confirmation)")
-	cleanFlag := flag.Bool("clean", false, "Remove git-ignored files and directories after syncing (asks for confirmation)")
-	forceFlag := flag.Bool("force", false, "Skip the confirmation required by --clean or --delete-archived")
+	deleteArchivedFlag := flag.Bool("delete-archived", false, "Delete eligible local clones excluded because they are archived (non-interactive)")
+	cleanFlag := flag.Bool("clean", false, "Remove git-ignored files and directories after syncing (non-interactive)")
+	forceFlag := flag.Bool("force", false, "With --delete-archived, delete despite local content or unpublished history (also accepted with --clean for compatibility)")
 	dryRunFlag := flag.Bool("dry-run", false, "With --clean or --delete-archived, preview removal without deleting anything")
 	flag.Parse()
 
@@ -138,7 +138,7 @@ func run() (exitCode int) {
 		printer.ConfigError(err)
 		return 1
 	}
-	// Cleanup includes interactive prompts and must finish before the next repo.
+	// Cleanup must finish before the next repository.
 	if *cleanFlag {
 		workerCount = 1
 	}
@@ -281,7 +281,7 @@ func run() (exitCode int) {
 		runRepoWorkers(scanResult.ManagedMissing, repoMap, workerCount, dir, int(verbosity), printer, (*sync.Engine).CloneRepo, func(result model.RepoResult) {
 			handleResult(printer, result, &summary)
 			if *cleanFlag && result.Action == model.ActionCloned {
-				cleanRepoIgnoredContent(eng, dir, result.Name, printer, *forceFlag, *dryRunFlag, &summary)
+				cleanRepoIgnoredContent(eng, dir, result.Name, printer, *dryRunFlag, &summary)
 			}
 			printer.AdvanceRepoProgress()
 		})
@@ -290,7 +290,7 @@ func run() (exitCode int) {
 		runRepoWorkers(scanResult.ManagedFound, repoMap, workerCount, dir, int(verbosity), printer, (*sync.Engine).ProcessRepo, func(result model.RepoResult) {
 			handleResult(printer, result, &summary)
 			if *cleanFlag {
-				cleanRepoIgnoredContent(eng, dir, result.Name, printer, *forceFlag, *dryRunFlag, &summary)
+				cleanRepoIgnoredContent(eng, dir, result.Name, printer, *dryRunFlag, &summary)
 			}
 			printer.AdvanceRepoProgress()
 		})
@@ -377,7 +377,7 @@ func runRepoWorkers(names []string, repos map[string]model.RepoInfo, workerCount
 
 // cleanRepoIgnoredContent is the final phase for one repository. It runs
 // immediately after that repository's normal sync work.
-func cleanRepoIgnoredContent(eng *sync.Engine, baseDir, name string, printer *output.Printer, force, dryRun bool, summary *model.Summary) {
+func cleanRepoIgnoredContent(eng *sync.Engine, baseDir, name string, printer *output.Printer, dryRun bool, summary *model.Summary) {
 	repoDir := filepath.Join(baseDir, name)
 	paths, err := eng.Git.IgnoredPaths(repoDir)
 	if err != nil {
@@ -402,9 +402,6 @@ func cleanRepoIgnoredContent(eng *sync.Engine, baseDir, name string, printer *ou
 		for _, target := range targets {
 			printer.Verbose("cleanup: %s would remove %s", name, target.Path)
 		}
-		return
-	}
-	if !force && !printer.ConfirmCleanup(name) {
 		return
 	}
 
@@ -469,12 +466,13 @@ func validateDeletionFlags(deleteArchived, clone, status, clean bool) error {
 }
 
 func deleteArchivedRepo(root string, repo model.RepoInfo, printer *output.Printer, force, dryRun bool) string {
-	info, err := archived.Check(root, repo)
+	info, err := archived.Check(root, repo, force)
 	if err != nil {
-		printer.ArchivedStatus(repo.Name, "retained: "+err.Error(), false)
 		if archived.IsRetained(err) {
+			printer.ArchivedStatus(repo.Name, "retained: "+err.Error()+"; use --force to override content/history protection", false)
 			return "retained"
 		}
+		printer.RepoError(repo.Name, "archive-deletion-error", err)
 		return "error"
 	}
 	if dryRun {
@@ -482,13 +480,9 @@ func deleteArchivedRepo(root string, repo model.RepoInfo, printer *output.Printe
 		return "planned"
 	}
 	printer.ArchivedStatus(repo.Name, "local folder eligible for deletion", false)
-	if !force && !printer.ConfirmArchivedDeletion(repo.Name) {
-		printer.ArchivedStatus(repo.Name, "local folder retained; deletion declined", false)
-		return "declined"
-	}
-	if err := archived.Remove(root, repo, info); err != nil {
+	if err := archived.Remove(root, repo, info, force); err != nil {
 		if archived.IsRetained(err) {
-			printer.ArchivedStatus(repo.Name, "retained: "+err.Error(), false)
+			printer.ArchivedStatus(repo.Name, "retained: "+err.Error()+"; --force overrides content/history protection", false)
 			return "retained"
 		}
 		printer.RepoError(repo.Name, "archive-deletion-error", err)

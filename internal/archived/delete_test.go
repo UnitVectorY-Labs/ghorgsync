@@ -2,6 +2,8 @@ package archived
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -115,5 +117,37 @@ func TestIgnoredContentAllowsDeletion(t *testing.T) {
 	}
 	if err := validateContent(status, "", "h hidden"); err == nil {
 		t.Fatal("ignored content bypassed index flag protection")
+	}
+}
+
+func TestForcePreservesEligibilityAndPathGuards(t *testing.T) {
+	root := t.TempDir()
+	for _, repo := range []model.RepoInfo{
+		{Name: "active"},
+		{Name: "../escape", IsArchived: true},
+		{Name: ".hidden", IsArchived: true},
+		{Name: "missing", IsArchived: true},
+	} {
+		if _, err := Check(root, repo, true); err == nil {
+			t.Fatalf("force bypassed guard for %+v", repo)
+		}
+	}
+	target := t.TempDir()
+	if err := os.Symlink(target, filepath.Join(root, "linked")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Check(root, model.RepoInfo{Name: "linked", IsArchived: true}, true); err == nil {
+		t.Fatal("force accepted symlink")
+	}
+	// A .git file indicates a linked worktree, not an eligible standalone clone.
+	clone := filepath.Join(root, "worktree")
+	if err := os.Mkdir(clone, 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(clone, ".git"), []byte("gitdir: elsewhere"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := Check(root, model.RepoInfo{Name: "worktree", IsArchived: true}, true); err == nil {
+		t.Fatal("force accepted worktree")
 	}
 }

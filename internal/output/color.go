@@ -1,7 +1,6 @@
 package output
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"strings"
@@ -416,32 +415,6 @@ func (p *Printer) RepoCleanupPlanned(name string, files int, size int64, dryRun 
 	})
 }
 
-// CleanupCancelled reports that the user declined the cleanup confirmation.
-func (p *Printer) CleanupCancelled() {
-	p.withProgressSuspended(func() {
-		fmt.Println(p.colorize(yellow, "  cleanup [cancelled]"))
-	})
-}
-
-// ConfirmCleanup prompts before deleting ignored content for one repository.
-func (p *Printer) ConfirmCleanup(name string) bool {
-	confirmed := false
-	p.withProgressSuspended(func() {
-		fmt.Printf("  repo %s cleanup: remove this ignored content? [y/N] ", name)
-		answer, err := bufio.NewReader(os.Stdin).ReadString('\n')
-		if err != nil && len(answer) == 0 {
-			fmt.Println()
-			return
-		}
-		answer = strings.ToLower(strings.TrimSpace(answer))
-		confirmed = answer == "y" || answer == "yes"
-	})
-	if !confirmed {
-		p.CleanupCancelled()
-	}
-	return confirmed
-}
-
 func formatBytes(size int64) string {
 	const unit = int64(1024)
 	if size < unit {
@@ -666,18 +639,6 @@ func (p *Printer) ArchivedStatus(name, detail string, deleted bool) {
 	p.withProgressSuspended(func() {
 		fmt.Printf("  %s %s %s\n", p.colorize(cyan, "repo"), p.colorize(bold, name), p.colorize(color, "[archived: "+detail+"]"))
 	})
-}
-
-// ConfirmArchivedDeletion requires an explicit affirmative answer for each clone.
-func (p *Printer) ConfirmArchivedDeletion(name string) bool {
-	confirmed := false
-	p.withProgressSuspended(func() {
-		fmt.Printf("  repo %s: permanently delete this archived local folder? [y/N] ", name)
-		var answer string
-		_, err := fmt.Fscanln(os.Stdin, &answer)
-		confirmed = err == nil && (strings.EqualFold(answer, "y") || strings.EqualFold(answer, "yes"))
-	})
-	return confirmed
 }
 
 // ArchivedTotals summarizes only the explicit archived deletion phase.

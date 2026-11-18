@@ -48,7 +48,7 @@ func MatchRemote(remote, expected string) bool {
 func git(dir string, args ...string) (string, error) {
 	cmd := exec.Command("git", append([]string{"-C", dir}, args...)...)
 	// Status must not refresh the index during a dry run.
-	cmd.Env = append(os.Environ(), "GIT_OPTIONAL_LOCKS=0", "GIT_NO_REPLACE_OBJECTS=1")
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_OPTIONAL_LOCKS=0", "GIT_NO_REPLACE_OBJECTS=1")
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("git %s failed: %w", strings.Join(args, " "), err)
@@ -67,10 +67,11 @@ func directory(path string) (os.FileInfo, error) {
 	return info, nil
 }
 
-// Check fails closed on unexpected layout, local content, or unpublished history.
+// Check always verifies identity and layout. Without force it also protects
+// local content and unpublished history.
 // Fetching into a temporary bare repository verifies current GitHub branches
 // without changing the candidate's refs, index, config, or working tree.
-func Check(root string, repo model.RepoInfo) (os.FileInfo, error) {
+func Check(root string, repo model.RepoInfo, force bool) (os.FileInfo, error) {
 	if !repo.IsArchived {
 		return nil, fmt.Errorf("repository is not archived")
 	}
@@ -100,10 +101,17 @@ func Check(root string, repo model.RepoInfo) (os.FileInfo, error) {
 	if !MatchRemote(remote, repo.CloneURL) {
 		return nil, fmt.Errorf("origin does not match GitHub repository")
 	}
-	for _, item := range []string{"worktrees", "modules", "objects/info/alternates", "info/grafts", "shallow"} {
+	for _, item := range []string{"worktrees", "objects/info/alternates", "info/grafts", "shallow"} {
 		if _, err := os.Lstat(filepath.Join(path, ".git", item)); !os.IsNotExist(err) {
 			return nil, fmt.Errorf("unsupported git metadata: %s", item)
 		}
+	}
+	// Force overrides local content/history protection, never identity or layout.
+	if force {
+		return info, nil
+	}
+	if _, err := os.Lstat(filepath.Join(path, ".git", "modules")); !os.IsNotExist(err) {
+		return nil, &RetainedError{Reason: "submodule data present; use --force to delete local content"}
 	}
 	if err := inspectContent(path); err != nil {
 		return nil, err
@@ -133,7 +141,7 @@ func Check(root string, repo model.RepoInfo) (os.FileInfo, error) {
 		return nil, fmt.Errorf("no local history could be verified")
 	}
 	cmd := exec.Command("git", "-C", temp, "rev-list", "--stdin", "--not", "--remotes=github")
-	cmd.Env = append(os.Environ(), "GIT_NO_REPLACE_OBJECTS=1")
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0", "GIT_NO_REPLACE_OBJECTS=1")
 	cmd.Stdin = strings.NewReader(commits + "\n")
 	out, err := cmd.Output()
 	if err != nil {
@@ -156,9 +164,9 @@ func Check(root string, repo model.RepoInfo) (os.FileInfo, error) {
 	return current, nil
 }
 
-// Remove checks again after confirmation and rejects directory replacement.
-func Remove(root string, repo model.RepoInfo, planned os.FileInfo) error {
-	current, err := Check(root, repo)
+// Remove rechecks eligibility and rejects directory replacement.
+func Remove(root string, repo model.RepoInfo, planned os.FileInfo, force bool) error {
+	current, err := Check(root, repo, force)
 	if err != nil {
 		return err
 	}
@@ -187,12 +195,12 @@ func validateContent(status, index, flags string) error {
 	}
 	for _, line := range strings.Split(index, "\n") {
 		if strings.HasPrefix(line, "160000 ") {
-			return fmt.Errorf("submodules present")
+			return &RetainedError{Reason: "submodules present; use --force to delete local content"}
 		}
 	}
 	for _, line := range strings.Split(flags, "\n") {
 		if len(line) > 0 && (line[0] == 'S' || (line[0] >= 'a' && line[0] <= 'z')) {
-			return fmt.Errorf("index contains skip-worktree or assume-unchanged entries")
+			return &RetainedError{Reason: "index contains skip-worktree or assume-unchanged entries; use --force to delete local content"}
 		}
 	}
 	return nil

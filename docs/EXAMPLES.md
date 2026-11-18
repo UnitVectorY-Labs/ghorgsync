@@ -313,13 +313,12 @@ This mode performs no git operations that modify repositories — no fetch, chec
 
 ### Ignored Content Cleanup
 
-Use `--clean` after the normal sync to remove ignored build artifacts and caches. ghorgsync shows the proposed content and waits for confirmation:
+Use `--clean` after the normal sync to remove ignored build artifacts and caches. The explicit flag authorizes deletion without prompting:
 
 ```
 $ ghorgsync --clean
   repo  web-frontend  [updated]
   repo  web-frontend  [cleanup: 42 files, 18.4 MiB would be removed]
-  repo web-frontend cleanup: remove this ignored content? [y/N] y
 
 Summary:
   total: 10 | cloned: 0 | updated: 1 | dirty: 0 | branch-drift: 0 | unknown: 0 | excluded-but-present: 0 | errors: 0
@@ -332,7 +331,7 @@ $ ghorgsync --clean --dry-run
   repo  web-frontend  [cleanup: 42 files, 18.4 MiB would be removed (dry-run)]
 ```
 
-For automation, use `--clean --force` only after reviewing a dry run. Add `--verbose` to either command to list every path that would be removed (dry run) or that was removed (cleanup).
+`--clean` runs non-interactively; `--force` is not required. Add `--verbose` to either command to list every path that would be removed (dry run) or that was removed (cleanup).
 
 ## Troubleshooting
 
@@ -406,10 +405,10 @@ ghorgsync --delete-archived --dry-run
 
 Eligible folders print `[archived: would delete local folder (dry-run)]`. Unsafe candidates print the reason they are retained. Included repositories still undergo normal sync.
 
-After reviewing the preview, delete with per-folder confirmation:
+After reviewing the preview, delete eligible clones without prompting:
 
 ```sh
 ghorgsync --delete-archived
 ```
 
-For unattended deletion, use `ghorgsync --delete-archived --force`. Ignored files are removed with the archived clone. Tracked changes, non-ignored untracked files, submodules, and unpublished commits still prevent removal; `--force` only skips confirmation. See [Archived Repositories](USAGE.md#archived-repositories) for all safety checks.
+To also delete clones containing protected local work or unpublished history, use `ghorgsync --delete-archived --force`. Ignored files are removed with the archived clone. Without `--force`, tracked changes, non-ignored untracked files, submodules, and unpublished commits prevent removal. `--force` overrides these protections but preserves path and repository identity checks. Neither form prompts. See [Archived Repositories](USAGE.md#archived-repositories) for all safety checks.
