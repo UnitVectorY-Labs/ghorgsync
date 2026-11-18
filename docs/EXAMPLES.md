@@ -116,7 +116,7 @@ organization: my-org
 include_archived: true
 ```
 
-With this setting, archived repositories are cloned and synced like any other repository. Without it (the default), archived repositories are skipped and any existing local directories for them are reported as `excluded-but-present`.
+With this setting, archived repositories are cloned and synced like any other repository. Without it (the default), archived repositories are skipped and any existing local directories for them are reported as `[excluded: archived; local folder retained]`.
 
 ## Example Output
 
@@ -221,7 +221,7 @@ Summary:
 When a directory exists locally for a repository that is excluded by configuration:
 
 ```
-  folder  old-tool  [excluded-but-present]
+  repo  old-tool  [excluded: name matches exclude_repos; local folder retained]
 
 Summary:
   total: 5 | cloned: 0 | updated: 0 | dirty: 0 | branch-drift: 0 | unknown: 0 | excluded-but-present: 1 | errors: 0
@@ -241,7 +241,7 @@ A typical run with multiple findings:
        +15 -3 lines
   repo  docs-site  [branch-drift: checked out main, updated]
   folder  personal-project  [unknown]
-  folder  old-tool  [excluded-but-present]
+  repo  old-tool  [excluded: name matches exclude_repos; local folder retained]
 
 Summary:
   total: 8 | cloned: 1 | updated: 1 | dirty: 1 | branch-drift: 1 | unknown: 1 | excluded-but-present: 1 | errors: 0
@@ -395,3 +395,21 @@ If a submodule remote is unreachable, the repository is reported as a `submodule
 ```
 
 Fix the underlying submodule remote issue (network access, SSH keys, token scope) and re-run.
+
+## Delete Archived Local Clones
+
+With `include_archived` omitted or set to `false`, preview archived folders:
+
+```sh
+ghorgsync --delete-archived --dry-run
+```
+
+Eligible folders print `[archived: would delete local folder (dry-run)]`. Unsafe candidates print the reason they are retained. Included repositories still undergo normal sync.
+
+After reviewing the preview, delete with per-folder confirmation:
+
+```sh
+ghorgsync --delete-archived
+```
+
+For unattended deletion, use `ghorgsync --delete-archived --force`. Local changes, ignored files, submodules, and unpublished commits still prevent removal; `--force` only skips confirmation. See [Archived Repositories](USAGE.md#archived-repositories) for all safety checks.

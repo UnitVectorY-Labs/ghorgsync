@@ -649,3 +649,40 @@ func (p *Printer) AuthSwitched(user string) {
 		fmt.Printf("  %s auth %s %s\n", p.colorize(cyan, "system"), p.colorize(green, "[switched]"), user)
 	})
 }
+
+// ExcludedReason explains why a local repository is excluded from syncing.
+func (p *Printer) ExcludedReason(name, reason string) {
+	p.withProgressSuspended(func() {
+		fmt.Printf("  %s %s %s\n", p.colorize(cyan, "repo"), p.colorize(bold, name), p.colorize(yellow, "[excluded: "+reason+"; local folder retained]"))
+	})
+}
+
+// ArchivedStatus reports the outcome of an archived clone inspection or deletion.
+func (p *Printer) ArchivedStatus(name, detail string, deleted bool) {
+	color := yellow
+	if deleted {
+		color = green
+	}
+	p.withProgressSuspended(func() {
+		fmt.Printf("  %s %s %s\n", p.colorize(cyan, "repo"), p.colorize(bold, name), p.colorize(color, "[archived: "+detail+"]"))
+	})
+}
+
+// ConfirmArchivedDeletion requires an explicit affirmative answer for each clone.
+func (p *Printer) ConfirmArchivedDeletion(name string) bool {
+	confirmed := false
+	p.withProgressSuspended(func() {
+		fmt.Printf("  repo %s: permanently delete this archived local folder? [y/N] ", name)
+		var answer string
+		_, err := fmt.Fscanln(os.Stdin, &answer)
+		confirmed = err == nil && (strings.EqualFold(answer, "y") || strings.EqualFold(answer, "yes"))
+	})
+	return confirmed
+}
+
+// ArchivedTotals summarizes only the explicit archived deletion phase.
+func (p *Printer) ArchivedTotals(deleted, planned, retained int) {
+	p.withProgressSuspended(func() {
+		fmt.Println(p.colorize(gray, fmt.Sprintf("  archived folders: deleted: %d | would-delete: %d | retained: %d", deleted, planned, retained)))
+	})
+}

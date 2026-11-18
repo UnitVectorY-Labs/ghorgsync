@@ -86,8 +86,9 @@ ghorgsync [flags]
 | `--clone` | Clone-only mode: only clone missing repositories (see [Clone-Only Mode](#clone-only-mode)) |
 | `--status` | Status mode: show only dirty repos and branch drift (see [Status Mode](#status-mode)) |
 | `--clean` | After each repository's normal sync work, remove its Git-ignored files and directories (see [Ignored Content Cleanup](#ignored-content-cleanup)). Prompts for confirmation unless `--force` is supplied. |
-| `--force` | Skip the confirmation prompt for `--clean`. Requires `--clean`. |
-| `--dry-run` | With `--clean`, report the ignored content that would be removed without deleting anything or prompting. Requires `--clean`. |
+| `--delete-archived` | Delete verified local clones excluded because they are archived, after confirmation. See [Archived Repositories](#archived-repositories). |
+| `--force` | Skip confirmation for `--clean` or `--delete-archived`. Requires one of these flags. |
+| `--dry-run` | Preview removal for `--clean` or `--delete-archived` without deleting selected content or prompting. Requires one of these flags. |
 
 ### Mode Flags
 
@@ -214,7 +215,7 @@ At normal verbosity, each repository shows the aggregate cleanup result. `--verb
 
 **ghorgsync** enforces hard constraints that must never be violated:
 
-- **Never deletes directories by default:** unknown folders and excluded-but-present repos are reported but left untouched. The explicit `--clean` option is the sole exception: after confirmation (or with `--force`), it removes only Git-ignored files and directories inside managed repositories.
+- **Never deletes directories by default:** unknown folders and excluded-but-present repos are reported but left untouched. Explicit removal options are the exceptions: `--delete-archived` removes only verified archived clones as described below; `--clean` removes only Git-ignored files and directories inside managed repositories after confirmation (or with `--force`).
 - **Never discards local changes:** dirty repos are skipped for checkout/pull operations.
 - **Never runs destructive git commands:** no `git reset --hard`, no `git clean -fd`, no force checkouts.
 - `fetch` is always considered safe and is always performed.
@@ -291,7 +292,7 @@ Audit findings are user-facing warnings, not command failures.
 |---|---|
 | **Managed** | Corresponds to an included GitHub repository. Cloned if missing; synced/audited if present. |
 | **Unknown** | A directory that does not match any repository (included or excluded) in the organization or user account. |
-| **Excluded-but-present** | A directory matching a repository excluded by name or pattern. Reported but not modified. |
+| **Excluded-but-present** | A directory matching a repository excluded because it is archived or matches an `exclude_repos` pattern. The reason is reported; retained unless explicitly eligible for `--delete-archived`. |
 | **Collision** | A managed repo path exists but is not a usable git clone (e.g., a regular file, non-git directory, or remote mismatch). Reported and skipped. |
 
 {: .highlight }
@@ -301,8 +302,20 @@ Hidden entries (starting with `.`) are skipped during scanning. The exception be
 
 GitHub repositories can be archived, making them read-only. **ghorgsync** treats archived repositories based on the `include_archived` configuration setting:
 
-- **Default (`include_archived: false`):** Archived repositories are ignored entirely. They are not cloned and are not synced. If a local directory exists for an archived repository, it is classified as **excluded-but-present** and reported accordingly.
+- **Default (`include_archived: false`):** Archived repositories are ignored entirely. They are not cloned and are not synced. If a local directory exists for an archived repository, it is classified as **excluded-but-present** and reported as `[excluded: archived; local folder retained]`. Name exclusions report `[excluded: name matches exclude_repos; local folder retained]`.
 - **Opt-in (`include_archived: true`):** Archived repositories are treated like any other repository — cloned if missing, and synced (fetch/audit) if present.
+
+### Deleting Local Archived Clones
+
+Use `ghorgsync --delete-archived --dry-run` to preview eligible local folders, then `ghorgsync --delete-archived` to delete them with a separate confirmation for each folder. Only `y` or `yes` confirms. `--force` skips confirmation; `--dry-run` takes precedence over `--force`.
+
+This option requires `include_archived: false` (the default) and cannot be combined with `--clone`, `--status`, or `--clean`. Normal sync still runs for included repositories, including during a deletion dry run; the dry run suppresses archived-folder deletion only. GitHub discovery must succeed. Only folders classified as excluded because GitHub identifies their repository as archived are candidates. Unknown folders, name exclusions alone, and repositories filtered out by visibility are never deletion candidates.
+
+Each candidate must be an immediate visible child of the sync root, a real directory with a normal `.git` directory, and have an origin matching the GitHub repository. Symlinks, linked worktrees, repositories with linked worktrees, submodules, shallow clones, object alternates, grafts, and unexpected repository roots are retained. Any staged or unstaged changes, untracked files, ignored content, or index flags that hide changes also prevent deletion.
+
+The command fetches the API-provided clone URL into a temporary bare repository and verifies that all commits reachable from local refs, HEAD, and reflogs are reachable from the freshly fetched GitHub branches. Local-only branches, stashes, tags, or reflog history therefore prevent deletion when they contain unpublished commits. Failed checks retain the folder and report the reason. Fetches do not modify the candidate clone. Inspection is repeated after confirmation, and a replaced directory is rejected. Avoid editing candidates concurrently with deletion: inspection and filesystem removal cannot form an atomic transaction.
+
+Output identifies folders that would be deleted, were deleted, were declined, or were retained, followed by deletion totals. Successfully deleted folders are removed from the `excluded-but-present` summary count. Failed safety checks also increment the error counter. Default runs retain all excluded folders.
 
 ## Empty (Uninitialized) Repositories
 

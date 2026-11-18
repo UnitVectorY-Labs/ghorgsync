@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/UnitVectorY-Labs/ghorgsync/internal/archived"
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/cleanup"
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/config"
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/github"
@@ -75,18 +76,23 @@ func run() (exitCode int) {
 	workersFlag := flag.String("workers", "", "Maximum concurrent repositories (GHORGSYNC_WORKERS; default: 4 times logical CPU count, capped at 32; 1 for sequential processing)")
 	cloneOnlyFlag := flag.Bool("clone", false, "Only clone missing repositories (skip processing existing repos)")
 	statusFlag := flag.Bool("status", false, "Show status of repositories (dirty repos and branch drift only)")
+	deleteArchivedFlag := flag.Bool("delete-archived", false, "Delete safely verified local clones excluded because they are archived (asks for confirmation)")
 	cleanFlag := flag.Bool("clean", false, "Remove git-ignored files and directories after syncing (asks for confirmation)")
-	forceFlag := flag.Bool("force", false, "Skip the confirmation required by --clean")
-	dryRunFlag := flag.Bool("dry-run", false, "With --clean, report ignored content that would be removed without deleting it")
+	forceFlag := flag.Bool("force", false, "Skip the confirmation required by --clean or --delete-archived")
+	dryRunFlag := flag.Bool("dry-run", false, "With --clean or --delete-archived, preview removal without deleting anything")
 	flag.Parse()
 
+	if err := validateDeletionFlags(*deleteArchivedFlag, *cloneOnlyFlag, *statusFlag, *cleanFlag); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		return 1
+	}
 	// Mode flags are mutually exclusive
 	if *cloneOnlyFlag && *statusFlag {
 		fmt.Fprintln(os.Stderr, "error: --clone and --status are mutually exclusive")
 		return 1
 	}
-	if (*forceFlag || *dryRunFlag) && !*cleanFlag {
-		fmt.Fprintln(os.Stderr, "error: --force and --dry-run require --clean")
+	if (*forceFlag || *dryRunFlag) && !*cleanFlag && !*deleteArchivedFlag {
+		fmt.Fprintln(os.Stderr, "error: --force and --dry-run require --clean or --delete-archived")
 		return 1
 	}
 	if *cleanFlag && (*cloneOnlyFlag || *statusFlag) {
@@ -145,6 +151,11 @@ func run() (exitCode int) {
 	}
 	if err := cfg.Validate(); err != nil {
 		printer.ConfigError(err)
+		return 1
+	}
+
+	if *deleteArchivedFlag && cfg.ShouldIncludeArchived() {
+		printer.ConfigError(fmt.Errorf("--delete-archived requires include_archived: false"))
 		return 1
 	}
 
@@ -221,6 +232,7 @@ func run() (exitCode int) {
 
 	// Summary counters
 	var summary model.Summary
+	deletedArchived, plannedArchived, retainedArchived := 0, 0, 0
 	summary.TotalRepos = len(included)
 	summary.Empty = len(emptyRepos)
 
@@ -297,9 +309,37 @@ func run() (exitCode int) {
 
 		// Report excluded-but-present
 		for _, entry := range scanResult.ExcludedButPresent {
-			printer.ExcludedButPresent(entry.Name)
+			reason := "name matches exclude_repos"
+			var candidate model.RepoInfo
+			for _, repo := range allRepos {
+				if repo.Name == entry.Name && archived.Candidate(repo, cfg) {
+					reason = "archived"
+					candidate = repo
+					break
+				}
+			}
+			if *deleteArchivedFlag && candidate.IsArchived {
+				result := deleteArchivedRepo(dir, candidate, printer, *forceFlag, *dryRunFlag)
+				if result == "deleted" {
+					summary.ExcludedButPresent--
+					deletedArchived++
+				} else if result == "planned" {
+					plannedArchived++
+				} else {
+					retainedArchived++
+				}
+				if result == "error" {
+					summary.Errors++
+				}
+			} else {
+				printer.ExcludedReason(entry.Name, reason)
+			}
 		}
 
+	}
+
+	if *deleteArchivedFlag {
+		printer.ArchivedTotals(deletedArchived, plannedArchived, retainedArchived)
 	}
 
 	// Print summary
@@ -419,4 +459,34 @@ func handleResult(printer *output.Printer, result model.RepoResult, summary *mod
 		printer.RepoError(result.Name, result.Action.String(), result.Error)
 		summary.Errors++
 	}
+}
+
+func validateDeletionFlags(deleteArchived, clone, status, clean bool) error {
+	if deleteArchived && (clone || status || clean) {
+		return fmt.Errorf("--delete-archived cannot be combined with --clone, --status, or --clean")
+	}
+	return nil
+}
+
+func deleteArchivedRepo(root string, repo model.RepoInfo, printer *output.Printer, force, dryRun bool) string {
+	info, err := archived.Check(root, repo)
+	if err != nil {
+		printer.ArchivedStatus(repo.Name, "retained: "+err.Error(), false)
+		return "error"
+	}
+	if dryRun {
+		printer.ArchivedStatus(repo.Name, "would delete local folder (dry-run)", false)
+		return "planned"
+	}
+	printer.ArchivedStatus(repo.Name, "local folder eligible for deletion", false)
+	if !force && !printer.ConfirmArchivedDeletion(repo.Name) {
+		printer.ArchivedStatus(repo.Name, "local folder retained; deletion declined", false)
+		return "declined"
+	}
+	if err := archived.Remove(root, repo, info); err != nil {
+		printer.RepoError(repo.Name, "archive-deletion-error", err)
+		return "error"
+	}
+	printer.ArchivedStatus(repo.Name, "deleted local folder", true)
+	return "deleted"
 }
