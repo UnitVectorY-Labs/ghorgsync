@@ -472,6 +472,9 @@ func deleteArchivedRepo(root string, repo model.RepoInfo, printer *output.Printe
 	info, err := archived.Check(root, repo)
 	if err != nil {
 		printer.ArchivedStatus(repo.Name, "retained: "+err.Error(), false)
+		if archived.IsRetained(err) {
+			return "retained"
+		}
 		return "error"
 	}
 	if dryRun {
@@ -484,6 +487,10 @@ func deleteArchivedRepo(root string, repo model.RepoInfo, printer *output.Printe
 		return "declined"
 	}
 	if err := archived.Remove(root, repo, info); err != nil {
+		if archived.IsRetained(err) {
+			printer.ArchivedStatus(repo.Name, "retained: "+err.Error(), false)
+			return "retained"
+		}
 		printer.RepoError(repo.Name, "archive-deletion-error", err)
 		return "error"
 	}

@@ -315,7 +315,7 @@ Each candidate must be an immediate visible child of the sync root, a real direc
 
 The command fetches the API-provided clone URL into a temporary bare repository and verifies that all commits reachable from local refs, HEAD, and reflogs are reachable from the freshly fetched GitHub branches. Local-only branches, stashes, tags, or reflog history therefore prevent deletion when they contain unpublished commits. Failed checks retain the folder and report the reason. Fetches do not modify the candidate clone. Inspection is repeated after confirmation, and a replaced directory is rejected. Avoid editing candidates concurrently with deletion: inspection and filesystem removal cannot form an atomic transaction.
 
-Output identifies folders that would be deleted, were deleted, were declined, or were retained, followed by deletion totals. Successfully deleted folders are removed from the `excluded-but-present` summary count. Failed safety checks also increment the error counter. Default runs retain all excluded folders.
+Output identifies folders that would be deleted, were deleted, were declined, or were retained, followed by deletion totals. Successfully deleted folders are removed from the `excluded-but-present` summary count. Protected local changes, ignored content, and unpublished history count as retained folders rather than errors. Ignored-content messages include entry counts and example paths; history messages identify stashes and reflogs as possible blockers. Failed inspection commands still increment the error counter. Default runs retain all excluded folders.
 
 ## Empty (Uninitialized) Repositories
 

@@ -1,8 +1,10 @@
 package archived
 
 import (
+	"fmt"
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/config"
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/model"
+	"strings"
 	"testing"
 )
 
@@ -76,5 +78,24 @@ func TestCandidate(t *testing.T) {
 				t.Fatalf("Candidate = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestProtectedContentReasons(t *testing.T) {
+	for _, tt := range []struct{ status, want string }{
+		{"!! .DS_Store\n!! target/output.jar", "2 ignored entries (.DS_Store, target/output.jar)"},
+		{" M tracked\n!! ignored", "1 changed or untracked entries"},
+		{"?? new", "1 changed or untracked entries"},
+	} {
+		err := validateContent(tt.status, "", "")
+		if !IsRetained(err) || !strings.Contains(err.Error(), tt.want) {
+			t.Fatalf("reason = %v, want %s", err, tt.want)
+		}
+	}
+	if IsRetained(fmt.Errorf("command failed")) || IsRetained(nil) {
+		t.Fatal("operational errors must not be safety findings")
+	}
+	if !IsRetained(fmt.Errorf("wrapped: %w", &RetainedError{Reason: "protected"})) {
+		t.Fatal("wrapped finding was lost")
 	}
 }

@@ -2,6 +2,7 @@
 package archived
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -139,7 +140,7 @@ func Check(root string, repo model.RepoInfo) (os.FileInfo, error) {
 		return nil, fmt.Errorf("cannot verify local history: %w", err)
 	}
 	if len(out) != 0 {
-		return nil, fmt.Errorf("local commits are not reachable from GitHub branches")
+		return nil, &RetainedError{Reason: "local-only history (including stashes and reflogs) is not reachable from GitHub branches; inspect git stash list and git log --all --reflog --not --remotes=origin"}
 	}
 	// Network verification can take time; inspect local content again afterward.
 	if err := inspectContent(path); err != nil {
@@ -174,7 +175,22 @@ func Remove(root string, repo model.RepoInfo, planned os.FileInfo) error {
 // validateContent is deliberately independent of git execution for unit testing.
 func validateContent(status, index, flags string) error {
 	if status != "" {
-		return fmt.Errorf("local changes, untracked files, or ignored content present")
+		ignored, changed := 0, 0
+		var examples []string
+		for _, line := range strings.Split(status, "\n") {
+			if strings.HasPrefix(line, "!! ") {
+				ignored++
+				if len(examples) < 3 {
+					examples = append(examples, strings.TrimPrefix(line, "!! "))
+				}
+			} else if line != "" {
+				changed++
+			}
+		}
+		if changed > 0 {
+			return &RetainedError{Reason: fmt.Sprintf("%d changed or untracked entries; local folder protected", changed)}
+		}
+		return &RetainedError{Reason: fmt.Sprintf("%d ignored entries (%s); ignored content is protected", ignored, strings.Join(examples, ", "))}
 	}
 	for _, line := range strings.Split(index, "\n") {
 		if strings.HasPrefix(line, "160000 ") {
@@ -210,4 +226,15 @@ func inspectContent(path string) error {
 		return err
 	}
 	return validateContent(status, index, flags)
+}
+
+// RetainedError is an expected safety finding rather than an operational error.
+type RetainedError struct{ Reason string }
+
+func (e *RetainedError) Error() string { return e.Reason }
+
+// IsRetained distinguishes protected local data from failed inspection commands.
+func IsRetained(err error) bool {
+	var retained *RetainedError
+	return errors.As(err, &retained)
 }
