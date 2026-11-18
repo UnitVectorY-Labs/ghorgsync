@@ -1,7 +1,6 @@
 package output
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"strings"
@@ -416,32 +415,6 @@ func (p *Printer) RepoCleanupPlanned(name string, files int, size int64, dryRun 
 	})
 }
 
-// CleanupCancelled reports that the user declined the cleanup confirmation.
-func (p *Printer) CleanupCancelled() {
-	p.withProgressSuspended(func() {
-		fmt.Println(p.colorize(yellow, "  cleanup [cancelled]"))
-	})
-}
-
-// ConfirmCleanup prompts before deleting ignored content for one repository.
-func (p *Printer) ConfirmCleanup(name string) bool {
-	confirmed := false
-	p.withProgressSuspended(func() {
-		fmt.Printf("  repo %s cleanup: remove this ignored content? [y/N] ", name)
-		answer, err := bufio.NewReader(os.Stdin).ReadString('\n')
-		if err != nil && len(answer) == 0 {
-			fmt.Println()
-			return
-		}
-		answer = strings.ToLower(strings.TrimSpace(answer))
-		confirmed = answer == "y" || answer == "yes"
-	})
-	if !confirmed {
-		p.CleanupCancelled()
-	}
-	return confirmed
-}
-
 func formatBytes(size int64) string {
 	const unit = int64(1024)
 	if size < unit {
@@ -647,5 +620,30 @@ func (p *Printer) AuthError(err error) {
 func (p *Printer) AuthSwitched(user string) {
 	p.withProgressSuspended(func() {
 		fmt.Printf("  %s auth %s %s\n", p.colorize(cyan, "system"), p.colorize(green, "[switched]"), user)
+	})
+}
+
+// ExcludedReason explains why a local repository is excluded from syncing.
+func (p *Printer) ExcludedReason(name, reason string) {
+	p.withProgressSuspended(func() {
+		fmt.Printf("  %s %s %s\n", p.colorize(cyan, "repo"), p.colorize(bold, name), p.colorize(yellow, "[excluded: "+reason+"; local folder retained]"))
+	})
+}
+
+// ArchivedStatus reports the outcome of an archived clone inspection or deletion.
+func (p *Printer) ArchivedStatus(name, detail string, deleted bool) {
+	color := yellow
+	if deleted {
+		color = green
+	}
+	p.withProgressSuspended(func() {
+		fmt.Printf("  %s %s %s\n", p.colorize(cyan, "repo"), p.colorize(bold, name), p.colorize(color, "[archived: "+detail+"]"))
+	})
+}
+
+// ArchivedTotals summarizes only the explicit archived deletion phase.
+func (p *Printer) ArchivedTotals(deleted, planned, retained int) {
+	p.withProgressSuspended(func() {
+		fmt.Println(p.colorize(gray, fmt.Sprintf("  archived folders: deleted: %d | would-delete: %d | retained: %d", deleted, planned, retained)))
 	})
 }

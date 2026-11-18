@@ -19,6 +19,8 @@ Clone and update all organization or user account repositories in one folder, wi
 - **Non-destructive** — never deletes directories, discards local changes, or runs destructive git commands
 - **Dirty repo detection** — reports staged/unstaged changes with file details and line counts
 - **Branch drift audit** — detects and corrects default branch drift on clean repos
-- **Stray content warnings** — identifies unknown folders and excluded-but-present repos
+- **Stray content warnings** — identifies unknown folders and explains excluded local repos (including archived repos)
 - **Quiet by default** — only prints actions and findings; `--verbose` adds API and git command diagnostics
 - **Colorized output** — structured, color-coded terminal output (honors `NO_COLOR`)
+
+Archived local clones can be removed explicitly with `--delete-archived`; preview with `--delete-archived --dry-run`. Deletion is non-interactive. Tracked changes, non-ignored untracked files, and unpublished history prevent deletion unless `--force` is supplied; ignored content is removed with the clone. See [Archived Repositories](USAGE.md#archived-repositories).

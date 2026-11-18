@@ -85,9 +85,10 @@ ghorgsync [flags]
 | `--workers N` | Maximum repositories processed concurrently. Defaults to four times the number of logical CPUs reported by Go, capped at 32. Overrides `GHORGSYNC_WORKERS`; use `1` for sequential processing. Must be a positive integer. `--clean` always runs sequentially. |
 | `--clone` | Clone-only mode: only clone missing repositories (see [Clone-Only Mode](#clone-only-mode)) |
 | `--status` | Status mode: show only dirty repos and branch drift (see [Status Mode](#status-mode)) |
-| `--clean` | After each repository's normal sync work, remove its Git-ignored files and directories (see [Ignored Content Cleanup](#ignored-content-cleanup)). Prompts for confirmation unless `--force` is supplied. |
-| `--force` | Skip the confirmation prompt for `--clean`. Requires `--clean`. |
-| `--dry-run` | With `--clean`, report the ignored content that would be removed without deleting anything or prompting. Requires `--clean`. |
+| `--clean` | After each repository's normal sync work, remove its Git-ignored files and directories (see [Ignored Content Cleanup](#ignored-content-cleanup)). Runs without prompting. |
+| `--delete-archived` | Delete verified local clones excluded because they are archived, without prompting. See [Archived Repositories](#archived-repositories). |
+| `--force` | With `--delete-archived`, override local content/history protection. Path and repository identity checks still apply. Accepted with `--clean` for compatibility. |
+| `--dry-run` | Preview removal for `--clean` or `--delete-archived` without deleting selected content or prompting. Requires one of these flags. |
 
 ### Mode Flags
 
@@ -101,7 +102,7 @@ By default, ghorgsync processes up to four repositories per logical CPU (hardwar
 
 The limit applies to default sync, `--clone`, and `--status`. Missing repositories finish cloning before the existing-repository phase starts. Within each phase, workers take the next repository as soon as they finish; the actual worker count never exceeds the number of repositories in that phase. Commands within a repository retain their sequential order and existing dirty-tree and default-branch rules. Git may create its own subprocesses or threads, so this setting limits repositories, not total OS threads or network connections.
 
-`--workers 1` processes repositories sequentially. Runs with `--clean` also use one worker, including `--force` and `--dry-run`, so each repository's cleanup and any confirmation finish before the next repository begins. The worker count is still validated.
+`--workers 1` processes repositories sequentially. Runs with `--clean` also use one worker, including `--force` and `--dry-run`, so each repository's cleanup finishes before the next repository begins. The worker count is still validated.
 
 Parallelism can overlap network waits; the best setting also depends on disk speed, bandwidth, repository sizes, and remote performance. Lower the limit if simultaneous clones or updates contend for those resources. `--verbose` reports discovery and scan times, each repository's processing time, and total elapsed time. Per-repository times overlap and should not be summed as wall-clock runtime.
 
@@ -192,7 +193,7 @@ For each included repository that exists locally:
 
 ### Ignored Content Cleanup
 
-Pass `--clean` to remove build products, caches, and other ignored content left behind in managed repositories. Cleanup is the final step for each repository: its normal clone, fetch, dirty-state, checkout, and pull work completes first, then its ignored content is inspected and cleaned before ghorgsync starts the next repository. It applies to dirty repositories too; only ignored content is selected, so staged, unstaged, and untracked files are never removed.
+Pass `--clean` to remove build products, caches, and other ignored content left behind in managed repositories. Cleanup is non-interactive and is the final step for each repository: its normal clone, fetch, dirty-state, checkout, and pull work completes first, then its ignored content is inspected and cleaned before ghorgsync starts the next repository. It applies to dirty repositories too; only ignored content is selected, so staged, unstaged, and untracked files are never removed.
 
 Ignored paths are identified with:
 
@@ -200,13 +201,7 @@ Ignored paths are identified with:
 git ls-files -z --others --ignored --exclude-standard
 ```
 
-The NUL-delimited form safely handles unusual file names. Before deleting a repository's content, ghorgsync reports the number of files and bytes selected and asks:
-
-```
-repo example-repo cleanup: remove this ignored content? [y/N]
-```
-
-Only `y` or `yes` confirms the deletion. Use `--force` when running non-interactively and you have reviewed the cleanup scope. Use `--dry-run` to obtain the same per-repository counts without prompting or changing any files. `--dry-run` takes precedence over `--force` and never deletes content.
+The NUL-delimited form safely handles unusual file names. The explicit `--clean` flag authorizes removal without prompting. Before deletion, ghorgsync reports the number of files and bytes selected. `--force` remains accepted with `--clean` for compatibility and is not required. Use `--dry-run` to report the same counts without changing files; it takes precedence over `--force`.
 
 At normal verbosity, each repository shows the aggregate cleanup result. `--verbose` additionally prints every ignored path that would be removed in a dry run, or every path after it is deleted during a real cleanup.
 
@@ -214,8 +209,8 @@ At normal verbosity, each repository shows the aggregate cleanup result. `--verb
 
 **ghorgsync** enforces hard constraints that must never be violated:
 
-- **Never deletes directories by default:** unknown folders and excluded-but-present repos are reported but left untouched. The explicit `--clean` option is the sole exception: after confirmation (or with `--force`), it removes only Git-ignored files and directories inside managed repositories.
-- **Never discards local changes:** dirty repos are skipped for checkout/pull operations.
+- **Never deletes directories by default:** unknown folders and excluded-but-present repos are reported but left untouched. Explicit removal options are the exceptions: `--delete-archived` removes only verified archived clones as described below; `--clean` removes only Git-ignored files and directories inside managed repositories without prompting.
+- **Never discards local changes during sync:** dirty repos are skipped for checkout/pull operations. Explicit `--delete-archived --force` authorizes deleting local work in eligible archived clones.
 - **Never runs destructive git commands:** no `git reset --hard`, no `git clean -fd`, no force checkouts.
 - `fetch` is always considered safe and is always performed.
 - `git submodule update --init --recursive` (without `--force`) is safe and will not overwrite local changes inside submodule directories.
@@ -291,7 +286,7 @@ Audit findings are user-facing warnings, not command failures.
 |---|---|
 | **Managed** | Corresponds to an included GitHub repository. Cloned if missing; synced/audited if present. |
 | **Unknown** | A directory that does not match any repository (included or excluded) in the organization or user account. |
-| **Excluded-but-present** | A directory matching a repository excluded by name or pattern. Reported but not modified. |
+| **Excluded-but-present** | A directory matching a repository excluded because it is archived or matches an `exclude_repos` pattern. The reason is reported; retained unless explicitly eligible for `--delete-archived`. |
 | **Collision** | A managed repo path exists but is not a usable git clone (e.g., a regular file, non-git directory, or remote mismatch). Reported and skipped. |
 
 {: .highlight }
@@ -301,8 +296,22 @@ Hidden entries (starting with `.`) are skipped during scanning. The exception be
 
 GitHub repositories can be archived, making them read-only. **ghorgsync** treats archived repositories based on the `include_archived` configuration setting:
 
-- **Default (`include_archived: false`):** Archived repositories are ignored entirely. They are not cloned and are not synced. If a local directory exists for an archived repository, it is classified as **excluded-but-present** and reported accordingly.
+- **Default (`include_archived: false`):** Archived repositories are ignored entirely. They are not cloned and are not synced. If a local directory exists for an archived repository, it is classified as **excluded-but-present** and reported as `[excluded: archived; local folder retained]`. Name exclusions report `[excluded: name matches exclude_repos; local folder retained]`.
 - **Opt-in (`include_archived: true`):** Archived repositories are treated like any other repository — cloned if missing, and synced (fetch/audit) if present.
+
+### Deleting Local Archived Clones
+
+Use `ghorgsync --delete-archived --dry-run` to preview eligible local folders, then `ghorgsync --delete-archived` to delete them without prompting. `--force` explicitly authorizes removal of protected local content and unpublished history; `--dry-run` takes precedence over `--force`.
+
+This option requires `include_archived: false` (the default) and cannot be combined with `--clone`, `--status`, or `--clean`. Normal sync still runs for included repositories, including during a deletion dry run; the dry run suppresses archived-folder deletion only. GitHub discovery must succeed. Only folders classified as excluded because GitHub identifies their repository as archived are candidates. Unknown folders, name exclusions alone, and repositories filtered out by visibility are never deletion candidates.
+
+Each candidate must be an immediate visible child of the sync root, a real directory with a normal `.git` directory, and have an origin matching the GitHub repository. Symlinks, linked worktrees, repositories with linked worktrees, shallow clones, object alternates, grafts, and unexpected repository roots are retained. Without `--force`, submodules, staged or unstaged changes, non-ignored untracked files, and index flags that hide changes also prevent deletion. Git-ignored content (such as build output, caches, and editor settings) does not block deletion and is removed along with the archived clone. No additional flag is required.
+
+Without `--force`, the command fetches the API-provided clone URL into a temporary bare repository and verifies that all commits reachable from local refs, HEAD, and reflogs are reachable from the freshly fetched GitHub branches. Local-only branches, stashes, tags, or reflog history therefore prevent deletion when they contain unpublished commits. Without `--force`, protected local content/history retains the folder and the reason is reported. Fetches do not modify the candidate clone. Inspection is repeated immediately before deletion, and a replaced directory is rejected. Avoid editing candidates concurrently with deletion: inspection and filesystem removal cannot form an atomic transaction.
+
+With `--delete-archived --force`, tracked changes, non-ignored untracked files, submodule content, index flags hiding changes, stashes, and unpublished commits do not prevent deletion. Content and history inspection (including the verification fetch) is skipped. This can permanently discard local work. GitHub archive eligibility, path containment, normal clone layout, origin identity, and symlink/linked-worktree safeguards remain mandatory. `--force --dry-run` previews this same forced eligibility without deleting folders. Neither mode reads stdin or asks for confirmation.
+
+Output identifies folders that would be deleted, were deleted, or were retained, followed by deletion totals. Successfully deleted folders are removed from the `excluded-but-present` summary count. Protected local changes and unpublished history count as retained folders rather than errors. History messages identify stashes and reflogs as possible blockers. Failed inspection commands still increment the error counter. Default runs retain all excluded folders.
 
 ## Empty (Uninitialized) Repositories
 

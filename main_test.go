@@ -48,3 +48,14 @@ func TestVersionString(t *testing.T) {
 		t.Fatalf("versionString should end with ')': %q", got)
 	}
 }
+
+func TestValidateDeletionFlags(t *testing.T) {
+	for mask := 0; mask < 16; mask++ {
+		deletion, clone, status, clean := mask&1 != 0, mask&2 != 0, mask&4 != 0, mask&8 != 0
+		err := validateDeletionFlags(deletion, clone, status, clean)
+		wantError := deletion && (clone || status || clean)
+		if (err != nil) != wantError {
+			t.Errorf("flags %04b: error = %v, want error %v", mask, err, wantError)
+		}
+	}
+}

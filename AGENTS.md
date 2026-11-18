@@ -4,14 +4,16 @@ This is a Go based command line application the follows idiomatic Go conventions
 
 ## Repo Conventions For The Agent
 - Treat `docs/` as required source of truth alongside code. When behavior changes, update the matching doc pages in the same PR.
+- Put documentation changes in the existing section or page that owns the topic. Do not append standalone feature notes or implementation commentary to the root README or unrelated pages; keep the root README focused on its existing overview and quick-start scope.
 - Keep dependencies minimal and prefer stdlib. Add third-party packages only when they materially improve correctness or output quality.
 
 ## Application Behavior That Must Not Drift
 
+- The CLI must be non-interactive: never prompt for confirmation or read stdin. Explicit flags authorize actions; `--dry-run` previews them. `--delete-archived --force` overrides local content/history protection but never repository identity or path safeguards.
 - Startup gate: only run when a repo-root dotfile named after the executable exists (for example `.ghorgsync`). If missing, emit a short message and exit successfully without doing anything else.
 - Non-destructive rules (hard constraints):
-  - never delete directories
-  - never discard local changes
+  - never delete directories by default; explicit `--clean` may remove only ignored content, and explicit `--delete-archived` may remove verified archived clones without prompting
+  - never discard local changes; archived deletion must retain tracked changes, non-ignored untracked files, and unpublished history unless `--force` explicitly authorizes their deletion; ignored content may be deleted with an eligible archived clone
   - never run destructive git commands (no `reset --hard`, no `clean -fd`, no force checkout)
 - Default branch is per-repository and must be sourced from GitHub metadata, not assumed.
 - Decision rules per repository:
