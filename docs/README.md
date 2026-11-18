@@ -23,4 +23,4 @@ Clone and update all organization or user account repositories in one folder, wi
 - **Quiet by default** — only prints actions and findings; `--verbose` adds API and git command diagnostics
 - **Colorized output** — structured, color-coded terminal output (honors `NO_COLOR`)
 
-Archived local clones can be removed explicitly with `--delete-archived`; preview with `--delete-archived --dry-run`. Local content and unpublished history prevent deletion. See [Archived Repositories](USAGE.md#archived-repositories).
+Archived local clones can be removed explicitly with `--delete-archived`; preview with `--delete-archived --dry-run`. Tracked changes, non-ignored untracked files, and unpublished history prevent deletion; ignored content is removed with the clone. See [Archived Repositories](USAGE.md#archived-repositories).

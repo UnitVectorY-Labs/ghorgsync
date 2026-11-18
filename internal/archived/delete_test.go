@@ -2,10 +2,11 @@ package archived
 
 import (
 	"fmt"
-	"github.com/UnitVectorY-Labs/ghorgsync/internal/config"
-	"github.com/UnitVectorY-Labs/ghorgsync/internal/model"
 	"strings"
 	"testing"
+
+	"github.com/UnitVectorY-Labs/ghorgsync/internal/config"
+	"github.com/UnitVectorY-Labs/ghorgsync/internal/model"
 )
 
 func TestPath(t *testing.T) {
@@ -37,7 +38,7 @@ func TestMatchRemote(t *testing.T) {
 }
 
 func TestValidateContent(t *testing.T) {
-	for _, status := range []string{"M  tracked", " M tracked", "?? new", "!! ignored", "D  deleted", "UU conflict"} {
+	for _, status := range []string{"M  tracked", " M tracked", "?? new", "D  deleted", "UU conflict"} {
 		if validateContent(status, "", "") == nil {
 			t.Errorf("accepted local content %q", status)
 		}
@@ -83,7 +84,6 @@ func TestCandidate(t *testing.T) {
 
 func TestProtectedContentReasons(t *testing.T) {
 	for _, tt := range []struct{ status, want string }{
-		{"!! .DS_Store\n!! target/output.jar", "2 ignored entries (.DS_Store, target/output.jar)"},
 		{" M tracked\n!! ignored", "1 changed or untracked entries"},
 		{"?? new", "1 changed or untracked entries"},
 	} {
@@ -97,5 +97,23 @@ func TestProtectedContentReasons(t *testing.T) {
 	}
 	if !IsRetained(fmt.Errorf("wrapped: %w", &RetainedError{Reason: "protected"})) {
 		t.Fatal("wrapped finding was lost")
+	}
+}
+
+func TestIgnoredContentAllowsDeletion(t *testing.T) {
+	status := "!! .DS_Store\n!! .vscode/settings.json\n!! target/output.jar"
+	if err := validateContent(status, "100644 abc 0\tfile", "H file"); err != nil {
+		t.Fatalf("ignored-only content should allow deletion: %v", err)
+	}
+	for _, protected := range []string{" M tracked", "M  staged", "?? new", "D  deleted", "UU conflict"} {
+		if err := validateContent(status+"\n"+protected, "", ""); !IsRetained(err) {
+			t.Fatalf("ignored content must not bypass protection for %q: %v", protected, err)
+		}
+	}
+	if err := validateContent(status, "160000 abc 0\tmodule", ""); err == nil {
+		t.Fatal("ignored content bypassed submodule protection")
+	}
+	if err := validateContent(status, "", "h hidden"); err == nil {
+		t.Fatal("ignored content bypassed index flag protection")
 	}
 }

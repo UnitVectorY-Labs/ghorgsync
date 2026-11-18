@@ -11,7 +11,7 @@ This is a Go based command line application the follows idiomatic Go conventions
 - Startup gate: only run when a repo-root dotfile named after the executable exists (for example `.ghorgsync`). If missing, emit a short message and exit successfully without doing anything else.
 - Non-destructive rules (hard constraints):
   - never delete directories by default; explicit `--clean` may remove only ignored content, and explicit `--delete-archived` may remove verified archived clones after confirmation (or `--force`)
-  - never discard local changes; archived deletion must reject local content and unpublished history
+  - never discard local changes; archived deletion must reject tracked changes, non-ignored untracked files, and unpublished history; ignored content may be deleted with an eligible archived clone
   - never run destructive git commands (no `reset --hard`, no `clean -fd`, no force checkout)
 - Default branch is per-repository and must be sourced from GitHub metadata, not assumed.
 - Decision rules per repository:

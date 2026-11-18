@@ -174,23 +174,16 @@ func Remove(root string, repo model.RepoInfo, planned os.FileInfo) error {
 
 // validateContent is deliberately independent of git execution for unit testing.
 func validateContent(status, index, flags string) error {
-	if status != "" {
-		ignored, changed := 0, 0
-		var examples []string
-		for _, line := range strings.Split(status, "\n") {
-			if strings.HasPrefix(line, "!! ") {
-				ignored++
-				if len(examples) < 3 {
-					examples = append(examples, strings.TrimPrefix(line, "!! "))
-				}
-			} else if line != "" {
-				changed++
-			}
+	// Ignored content is intentionally removed with the archived clone. Any
+	// tracked change or non-ignored untracked entry still protects the folder.
+	changed := 0
+	for _, line := range strings.Split(status, "\n") {
+		if line != "" && !strings.HasPrefix(line, "!! ") {
+			changed++
 		}
-		if changed > 0 {
-			return &RetainedError{Reason: fmt.Sprintf("%d changed or untracked entries; local folder protected", changed)}
-		}
-		return &RetainedError{Reason: fmt.Sprintf("%d ignored entries (%s); ignored content is protected", ignored, strings.Join(examples, ", "))}
+	}
+	if changed > 0 {
+		return &RetainedError{Reason: fmt.Sprintf("%d changed or untracked entries; local folder protected", changed)}
 	}
 	for _, line := range strings.Split(index, "\n") {
 		if strings.HasPrefix(line, "160000 ") {

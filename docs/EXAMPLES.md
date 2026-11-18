@@ -412,4 +412,4 @@ After reviewing the preview, delete with per-folder confirmation:
 ghorgsync --delete-archived
 ```
 
-For unattended deletion, use `ghorgsync --delete-archived --force`. Local changes, ignored files, submodules, and unpublished commits still prevent removal; `--force` only skips confirmation. See [Archived Repositories](USAGE.md#archived-repositories) for all safety checks.
+For unattended deletion, use `ghorgsync --delete-archived --force`. Ignored files are removed with the archived clone. Tracked changes, non-ignored untracked files, submodules, and unpublished commits still prevent removal; `--force` only skips confirmation. See [Archived Repositories](USAGE.md#archived-repositories) for all safety checks.
