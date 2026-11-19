@@ -18,12 +18,14 @@ type mockGitRunner struct {
 	statusErr     error
 }
 
-func (m *mockGitRunner) Clone(url, dest string) error               { return nil }
-func (m *mockGitRunner) Fetch(repoDir string) error                 { return nil }
-func (m *mockGitRunner) SubmoduleUpdate(repoDir string) error       { return nil }
-func (m *mockGitRunner) Checkout(repoDir, branch string) error      { return nil }
-func (m *mockGitRunner) PullFF(repoDir string) (bool, error)        { return false, nil }
-func (m *mockGitRunner) RemoteURL(repoDir string) (string, error)   { return "", nil }
+func (m *mockGitRunner) Clone(url, dest string) error          { return nil }
+func (m *mockGitRunner) Fetch(repoDir string) error            { return nil }
+func (m *mockGitRunner) SubmoduleUpdate(repoDir string) error  { return nil }
+func (m *mockGitRunner) Checkout(repoDir, branch string) error { return nil }
+func (m *mockGitRunner) PullFF(repoDir string) (bool, error)   { return false, nil }
+func (m *mockGitRunner) RemoteURL(repoDir string) (string, error) {
+	return "https://github.com/acme/test-repo.git", nil
+}
 func (m *mockGitRunner) DiffStats(repoDir string) (int, int, error) { return 0, 0, nil }
 func (m *mockGitRunner) CurrentBranch(repoDir string) (string, error) {
 	return m.currentBranch, m.branchErr
@@ -41,7 +43,7 @@ func TestStatusRepo_CleanOnDefaultBranch(t *testing.T) {
 		Git:     &mockGitRunner{currentBranch: "main"},
 		BaseDir: "/tmp",
 	}
-	repo := model.RepoInfo{Name: "test-repo", DefaultBranch: "main"}
+	repo := model.RepoInfo{Name: "test-repo", DefaultBranch: "main", CloneURL: "https://github.com/acme/test-repo.git"}
 
 	result := eng.StatusRepo(repo)
 
@@ -60,7 +62,7 @@ func TestStatusRepo_DirtyRepo(t *testing.T) {
 		},
 		BaseDir: "/tmp",
 	}
-	repo := model.RepoInfo{Name: "test-repo", DefaultBranch: "main"}
+	repo := model.RepoInfo{Name: "test-repo", DefaultBranch: "main", CloneURL: "https://github.com/acme/test-repo.git"}
 
 	result := eng.StatusRepo(repo)
 
@@ -80,7 +82,7 @@ func TestStatusRepo_BranchDrift(t *testing.T) {
 		Git:     &mockGitRunner{currentBranch: "feature"},
 		BaseDir: "/tmp",
 	}
-	repo := model.RepoInfo{Name: "test-repo", DefaultBranch: "main"}
+	repo := model.RepoInfo{Name: "test-repo", DefaultBranch: "main", CloneURL: "https://github.com/acme/test-repo.git"}
 
 	result := eng.StatusRepo(repo)
 
@@ -102,7 +104,7 @@ func TestStatusRepo_DirtyWithBranchDrift(t *testing.T) {
 		},
 		BaseDir: "/tmp",
 	}
-	repo := model.RepoInfo{Name: "test-repo", DefaultBranch: "main"}
+	repo := model.RepoInfo{Name: "test-repo", DefaultBranch: "main", CloneURL: "https://github.com/acme/test-repo.git"}
 
 	result := eng.StatusRepo(repo)
 
@@ -120,7 +122,7 @@ func TestStatusRepo_BranchError(t *testing.T) {
 		Git:     &mockGitRunner{branchErr: errors.New("not a git repo")},
 		BaseDir: "/tmp",
 	}
-	repo := model.RepoInfo{Name: "test-repo", DefaultBranch: "main"}
+	repo := model.RepoInfo{Name: "test-repo", DefaultBranch: "main", CloneURL: "https://github.com/acme/test-repo.git"}
 
 	result := eng.StatusRepo(repo)
 
@@ -140,7 +142,7 @@ func TestStatusRepo_DirtyCheckError(t *testing.T) {
 		},
 		BaseDir: "/tmp",
 	}
-	repo := model.RepoInfo{Name: "test-repo", DefaultBranch: "main"}
+	repo := model.RepoInfo{Name: "test-repo", DefaultBranch: "main", CloneURL: "https://github.com/acme/test-repo.git"}
 
 	result := eng.StatusRepo(repo)
 

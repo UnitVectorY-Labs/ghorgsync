@@ -13,7 +13,7 @@ Working with many repositories across a GitHub organization or user account mean
 - **One command sync** — clones missing repos, fetches and pulls existing ones, all in one pass
 - **Parallel repository processing** — defaults to four times the logical CPU count, capped at 32; tune with `--workers` or `GHORGSYNC_WORKERS` ([details](docs/USAGE.md#repository-concurrency))
 - **Organization and user accounts** — sync repos from a GitHub organization or a personal user account
-- **Non-destructive** — never deletes directories, discards local changes, or runs destructive git commands
+- **Non-destructive by default** — preserves local changes; deletion requires explicit cleanup or archived-removal flags
 - **Dirty repo detection** — reports staged/unstaged changes with file details and line counts
 - **Branch drift audit** — detects when a repo isn't on its default branch and corrects clean repos automatically
 - **Stray content warnings** — identifies unknown folders and explains excluded local repos (including archived repos) in your directory

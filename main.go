@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -51,6 +52,27 @@ func (c *countFlag) Set(s string) error {
 	return nil
 }
 
+// printUsage describes the modes and their safety boundaries before listing flags.
+func printUsage(w io.Writer, flags *flag.FlagSet) {
+	fmt.Fprintln(w, "Usage: ghorgsync [flags]")
+	fmt.Fprintln(w, "\nSync GitHub organization or user repositories in the current directory.")
+	fmt.Fprintln(w, "Requires a YAML dotfile named after the executable (normally .ghorgsync).")
+	fmt.Fprintln(w, "\nDefault: clone missing repositories; fetch existing repositories and only")
+	fmt.Fprintln(w, "checkout/pull when clean. --clone only clones; --status only reads local state.")
+	fmt.Fprintln(w, "\nRemoval requires --clean or --delete-archived. --dry-run previews removal;")
+	fmt.Fprintln(w, "normal sync still runs. --force overrides archived content/history protection.")
+	fmt.Fprintln(w, "\nUse -h or --help for help; --version prints build information.")
+	fmt.Fprintln(w, "\nFlags (single or double hyphens are accepted):")
+	flags.PrintDefaults()
+}
+
+func operationalExitCode(errors int) int {
+	if errors > 0 {
+		return 1
+	}
+	return 0
+}
+
 // main is the entry point for the ghorgsync command-line tool.
 func main() {
 	os.Exit(run())
@@ -68,6 +90,7 @@ func run() (exitCode int) {
 	}
 
 	// Parse flags
+	flag.Usage = func() { printUsage(flag.CommandLine.Output(), flag.CommandLine) }
 	versionFlag := flag.Bool("version", false, "Print version and exit")
 	var verbosity countFlag
 	flag.Var(&verbosity, "verbose", "Enable verbose output; repeat (--verbose --verbose) for trace-level detail including raw command output and API response bodies")
@@ -81,6 +104,10 @@ func run() (exitCode int) {
 	forceFlag := flag.Bool("force", false, "With --delete-archived, delete despite local content or unpublished history (also accepted with --clean for compatibility)")
 	dryRunFlag := flag.Bool("dry-run", false, "With --clean or --delete-archived, preview removal without deleting anything")
 	flag.Parse()
+	if flag.NArg() > 0 {
+		fmt.Fprintf(os.Stderr, "error: unexpected positional argument %q; usage: ghorgsync [flags]\n", flag.Arg(0))
+		return 1
+	}
 
 	if err := validateDeletionFlags(*deleteArchivedFlag, *cloneOnlyFlag, *statusFlag, *cleanFlag); err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err)
@@ -121,9 +148,13 @@ func run() (exitCode int) {
 	}
 	dotfileName := "." + baseName
 
-	if _, err := os.Stat(dotfileName); os.IsNotExist(err) {
-		printer.MissingDotfile(dotfileName)
-		return 0
+	if _, err := os.Stat(dotfileName); err != nil {
+		if os.IsNotExist(err) {
+			printer.MissingDotfile(dotfileName)
+			return 0
+		}
+		printer.ConfigError(err)
+		return 1
 	}
 
 	// Load and validate config
@@ -186,7 +217,7 @@ func run() (exitCode int) {
 	discoveryStarted := time.Now()
 	if cfg.IsUserMode() {
 		authUser, authUserErr := client.GetAuthenticatedUser()
-		if authUserErr == nil && authUser == cfg.User {
+		if authUserErr == nil && strings.EqualFold(authUser, cfg.User) {
 			allRepos, err = client.ListOwnRepos()
 		} else {
 			if cfg.ShouldIncludePrivate() {
@@ -235,6 +266,10 @@ func run() (exitCode int) {
 	deletedArchived, plannedArchived, retainedArchived := 0, 0, 0
 	summary.TotalRepos = len(included)
 	summary.Empty = len(emptyRepos)
+	summary.Errors = len(scanResult.Collisions)
+	for _, entry := range scanResult.Collisions {
+		printer.Collision(entry.Name, entry.Detail)
+	}
 
 	if *cloneOnlyFlag {
 		// Clone-only mode: only clone missing repos, skip everything else
@@ -258,7 +293,7 @@ func run() (exitCode int) {
 			case model.ActionBranchDrift:
 				printer.RepoStatusBranchDrift(result.Name, result.CurrentBranch, result.DefaultBranch)
 				summary.BranchDrift++
-			case model.ActionFetchError:
+			case model.ActionFetchError, model.ActionIdentityError:
 				printer.RepoError(result.Name, result.Action.String(), result.Error)
 				summary.Errors++
 			}
@@ -267,13 +302,12 @@ func run() (exitCode int) {
 
 		printer.FinishRepoProgress()
 
-		printer.StatusSummary(summary.TotalRepos, summary.Dirty, summary.BranchDrift)
-		return 0
+		printer.StatusSummary(len(scanResult.ManagedFound), summary.Dirty, summary.BranchDrift, summary.Errors, summary.Empty)
+		return operationalExitCode(summary.Errors)
 	} else {
 		// Default mode: full sync
 		summary.UnknownFolders = len(scanResult.Unknown)
 		summary.ExcludedButPresent = len(scanResult.ExcludedButPresent)
-		summary.Errors = len(scanResult.Collisions)
 
 		repoWorkTotal := len(scanResult.ManagedMissing) + len(scanResult.ManagedFound)
 		printer.StartRepoProgress(repoWorkTotal)
@@ -289,18 +323,13 @@ func run() (exitCode int) {
 		// Process existing repos
 		runRepoWorkers(scanResult.ManagedFound, repoMap, workerCount, dir, int(verbosity), printer, (*sync.Engine).ProcessRepo, func(result model.RepoResult) {
 			handleResult(printer, result, &summary)
-			if *cleanFlag {
+			if *cleanFlag && result.Action != model.ActionIdentityError {
 				cleanRepoIgnoredContent(eng, dir, result.Name, printer, *dryRunFlag, &summary)
 			}
 			printer.AdvanceRepoProgress()
 		})
 
 		printer.FinishRepoProgress()
-
-		// Report collisions
-		for _, entry := range scanResult.Collisions {
-			printer.Collision(entry.Name, entry.Detail)
-		}
 
 		// Report unknown folders
 		for _, entry := range scanResult.Unknown {
@@ -354,7 +383,7 @@ func run() (exitCode int) {
 		summary.Errors,
 		summary.Empty,
 	)
-	return 0
+	return operationalExitCode(summary.Errors)
 }
 
 // Each repository gets its own diagnostics context. Only the serial consumer
@@ -452,7 +481,10 @@ func handleResult(printer *output.Printer, result model.RepoResult, summary *mod
 		summary.BranchDrift++
 	case model.ActionAlreadyCurrent:
 		printer.Verbose("%s is already up to date", result.Name)
-	case model.ActionCloneError, model.ActionFetchError, model.ActionCheckoutError, model.ActionPullError, model.ActionSubmoduleError:
+	case model.ActionCloneError, model.ActionFetchError, model.ActionCheckoutError, model.ActionPullError, model.ActionSubmoduleError, model.ActionIdentityError:
+		if result.Updated {
+			summary.Updated++
+		}
 		printer.RepoError(result.Name, result.Action.String(), result.Error)
 		summary.Errors++
 	}

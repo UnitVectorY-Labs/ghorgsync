@@ -81,3 +81,36 @@ func TestScanDirectory_NonManagedDotDirIgnored(t *testing.T) {
 		t.Errorf("expected Unknown to be empty (hidden non-managed dirs ignored), got %v", result.Unknown)
 	}
 }
+
+func TestScanDirectory_UnmanagedGitRepoIsCollision(t *testing.T) {
+	dir := t.TempDir()
+	makeDotGit(t, dir, "unrelated")
+	if err := os.Mkdir(filepath.Join(dir, "notes"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	result, err := ScanDirectory(dir, nil, nil, &config.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Collisions) != 1 || result.Collisions[0].Name != "unrelated" {
+		t.Fatalf("unexpected collisions: %v", result.Collisions)
+	}
+	if len(result.Unknown) != 1 || result.Unknown[0].Name != "notes" {
+		t.Fatalf("unexpected unknowns: %v", result.Unknown)
+	}
+	if len(result.ManagedFound) != 0 || len(result.ManagedMissing) != 0 {
+		t.Fatal("unrelated repo scheduled for sync")
+	}
+}
+
+func TestScanDirectory_ExcludedGitRepoIsRetained(t *testing.T) {
+	dir := t.TempDir()
+	makeDotGit(t, dir, "archived")
+	result, err := ScanDirectory(dir, nil, []string{"archived"}, &config.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Collisions) != 0 || len(result.ExcludedButPresent) != 1 {
+		t.Fatalf("unexpected classification: %+v", result)
+	}
+}

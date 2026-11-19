@@ -87,6 +87,11 @@ func ScanDirectory(dir string, includedRepos []model.RepoInfo, excludedNames []s
 				Name:           name,
 				Classification: model.ClassExcludedButPresent,
 			})
+		} else if _, err := os.Lstat(filepath.Join(dir, name, ".git")); err == nil {
+			result.Collisions = append(result.Collisions, model.LocalEntry{
+				Name: name, Classification: model.ClassCollision,
+				Detail: "local git repository is not included in GitHub discovery; left untouched",
+			})
 		} else {
 			result.Unknown = append(result.Unknown, model.LocalEntry{
 				Name:           name,

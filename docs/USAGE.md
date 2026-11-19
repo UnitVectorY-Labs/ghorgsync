@@ -31,7 +31,7 @@ permalink: /usage
 | `include_public` | boolean | `true` | Include public repositories |
 | `include_private` | boolean | `true` | Include private and internal repositories |
 | `include_archived` | boolean | `false` | Include archived repositories |
-| `exclude_repos` | array | `[]` | Repository names or regex patterns to exclude |
+| `exclude_repos` | array | `[]` | Regular expressions matched against repository names |
 
 {: .highlight }
 Exactly one of `organization` or `user` must be specified. They cannot both be set.
@@ -52,11 +52,11 @@ See the GitHub CLI manuals for [auth status](https://cli.github.com/manual/gh_au
 
 ### Exclude Patterns
 
-The `exclude_repos` list supports both exact names and regular expressions. Patterns are matched against the repository name only (not the full URL or owner-qualified path).
+Every entry in `exclude_repos` is a Go regular expression. Matching is unanchored: `legacy-repo` also matches `my-legacy-repo`. Use `^legacy-repo$` for an exact name. Patterns are matched against the repository name only (not the full URL or owner-qualified path).
 
 ```yaml
 exclude_repos:
-  - legacy-repo          # exact match
+  - "^legacy-repo$"      # exact match
   - "^sandbox-"          # regex: repos starting with "sandbox-"
   - "-archive$"          # regex: repos ending with "-archive"
 ```
@@ -90,6 +90,8 @@ ghorgsync [flags]
 | `--force` | With `--delete-archived`, override local content/history protection. Path and repository identity checks still apply. Accepted with `--clean` for compatibility. |
 | `--dry-run` | Preview removal for `--clean` or `--delete-archived` without deleting selected content or prompting. Requires one of these flags. |
 
+No positional arguments are accepted. `-h` and `--help` print help without loading configuration or contacting GitHub. Invalid flag syntax and unknown flags exit with code `2`.
+
 ### Mode Flags
 
 The `--clone` and `--status` flags are mode flags that change the sync behavior. Mode flags are mutually exclusive; if multiple mode flags are provided, the command exits with an error. `--clean` is available only with the default sync mode, so it cannot be combined with `--clone` or `--status`.
@@ -122,12 +124,11 @@ When invoked, **ghorgsync** performs the following steps:
 2. **Resolve authentication** and connect to the GitHub API. See [Installation](INSTALL.md#prerequisites) for configuring authentication.
 3. **Fetch the repository list** from the GitHub organization or user account, including default branch metadata.
 4. **Filter repositories** by visibility (`include_public`/`include_private`), archived status (`include_archived`), and exclusion patterns.
-5. **Scan the local directory** and classify child entries (see [Local Directory Classification](#local-directory-classification)).
-6. **Clone missing repositories**.
-7. **Process existing repositories** (fetch, audit, conditionally checkout and pull).
-8. **Report findings** (collisions, unknown folders, excluded-but-present).
-9. **Optionally clean ignored content** as the final step for each managed repository when `--clean` was requested.
-10. **Print a summary line** with counts.
+5. **Scan the local directory**, classify child entries, and report collisions (see [Local Directory Classification](#local-directory-classification)).
+6. **Clone missing repositories**, then clean their ignored content if `--clean` was requested.
+7. **Process existing repositories** (fetch, audit, conditionally checkout and pull), cleaning ignored content after each repository if `--clean` was requested.
+8. **Report remaining findings** (unknown folders, excluded-but-present).
+9. **Print a summary line** with counts.
 
 During the repository clone/process phase, **ghorgsync** shows a live progress bar on TTY output to indicate completion across managed repositories. The progress bar scales to the full terminal width and uses smooth Unicode block characters (▏▎▍▌▋▊▉█) for high-resolution progress feedback. The layout shows the `repo` label and a padded counter on the left, a proportional bar in the center, and a color-coded percentage on the right:
 
@@ -148,7 +149,7 @@ When invoked with `--clone`, **ghorgsync** runs a streamlined workflow focused e
 **What is skipped** compared to the default workflow:
 
 - Processing existing repositories (fetch, dirty check, checkout, pull) is entirely skipped.
-- Collisions, unknown folders, and excluded-but-present findings are not reported.
+- Unknown folders and excluded-but-present findings are not reported. Path collisions and unrelated local Git repositories are reported as errors in every mode.
 - The progress bar only covers missing repositories to clone.
 
 This mode is useful when you know a new repository has been added to the organization or user account and you want to quickly pull it down without waiting for every existing repository to be fetched and checked.
@@ -168,10 +169,10 @@ When invoked with `--status`, **ghorgsync** runs a read-only workflow that repor
 
 - No git operations that modify the repository (no fetch, no checkout, no pull).
 - Missing repositories are not cloned.
-- Collisions, unknown folders, and excluded-but-present findings are not reported.
+- Unknown folders and excluded-but-present findings are not reported. Path collisions and unrelated local Git repositories are reported as errors in every mode.
 - Repositories that are clean and on their default branch produce no output.
 
-For dirty repositories, the colorized output from `git status --short` is displayed, showing staged and unstaged changes with git's native color coding. For repositories on a non-default branch (but otherwise clean), the current and default branches are shown.
+For dirty repositories, the output from `git status --short` is displayed, showing staged and unstaged changes with git's native color coding when color is enabled. For repositories on a non-default branch (but otherwise clean), the current and default branches are shown.
 
 This mode is useful for quickly surveying which repositories need attention without modifying anything.
 
@@ -179,7 +180,7 @@ This mode is useful for quickly surveying which repositories need attention with
 
 For each included repository that exists locally:
 
-1. **Fetch:** always performed (safe operation).
+1. **Verify identity, then fetch:** the origin must match the GitHub repository owner and name before any fetch or sync operation. Missing, unreadable, unsupported, or mismatched origins produce `identity-error`; no further processing or cleanup is attempted for that repository.
 2. **Submodule initialization:** `git submodule update --init --recursive` is run after every fetch to initialize any uninitialized submodules, preventing them from appearing as untracked files and causing a false dirty state.
 3. **Check dirty state:** detects staged changes, unstaged changes, and untracked files.
 4. **If dirty:**
@@ -193,7 +194,7 @@ For each included repository that exists locally:
 
 ### Ignored Content Cleanup
 
-Pass `--clean` to remove build products, caches, and other ignored content left behind in managed repositories. Cleanup is non-interactive and is the final step for each repository: its normal clone, fetch, dirty-state, checkout, and pull work completes first, then its ignored content is inspected and cleaned before ghorgsync starts the next repository. It applies to dirty repositories too; only ignored content is selected, so staged, unstaged, and untracked files are never removed.
+Pass `--clean` to remove build products, caches, and other ignored content left behind in managed repositories. Cleanup is non-interactive and is the final step for each repository: its normal clone, fetch, dirty-state, checkout, and pull work completes first, then its ignored content is inspected and cleaned before ghorgsync starts the next repository. It applies to dirty repositories too; only ignored content is selected, so tracked files and non-ignored untracked files are retained.
 
 Ignored paths are identified with:
 
@@ -203,7 +204,7 @@ git ls-files -z --others --ignored --exclude-standard
 
 The NUL-delimited form safely handles unusual file names. The explicit `--clean` flag authorizes removal without prompting. Before deletion, ghorgsync reports the number of files and bytes selected. `--force` remains accepted with `--clean` for compatibility and is not required. Use `--dry-run` to report the same counts without changing files; it takes precedence over `--force`.
 
-At normal verbosity, each repository shows the aggregate cleanup result. `--verbose` additionally prints every ignored path that would be removed in a dry run, or every path after it is deleted during a real cleanup.
+At normal verbosity, each repository shows the aggregate cleanup plan before removal. Failures are reported separately; the plan is not a count of successful removals. Normal sync still runs with `--clean --dry-run`; only cleanup deletion is suppressed. `--verbose` additionally prints every ignored path that would be removed in a dry run, or every path after it is deleted during a real cleanup.
 
 ### Non-Destructive Guarantees
 
@@ -212,7 +213,7 @@ At normal verbosity, each repository shows the aggregate cleanup result. `--verb
 - **Never deletes directories by default:** unknown folders and excluded-but-present repos are reported but left untouched. Explicit removal options are the exceptions: `--delete-archived` removes only verified archived clones as described below; `--clean` removes only Git-ignored files and directories inside managed repositories without prompting.
 - **Never discards local changes during sync:** dirty repos are skipped for checkout/pull operations. Explicit `--delete-archived --force` authorizes deleting local work in eligible archived clones.
 - **Never runs destructive git commands:** no `git reset --hard`, no `git clean -fd`, no force checkouts.
-- `fetch` is always considered safe and is always performed.
+- In default sync, `fetch` is performed only after repository identity is verified.
 - `git submodule update --init --recursive` (without `--force`) is safe and will not overwrite local changes inside submodule directories.
 
 ## Submodule Support
@@ -232,7 +233,6 @@ If submodule initialization fails (for example, due to a network error fetching 
 By default, **ghorgsync** only prints:
 
 - **Worker limit:** `workers: N` at startup
-
 - **Actions taken:** cloned, updated, branch checkout/pull
 - **Findings:** dirty repos, branch drift, unknown folders, excluded-but-present, collisions, errors
 - **Summary line:** counts for all categories
@@ -274,9 +274,12 @@ Color can be disabled by:
 | Code | Meaning |
 |---|---|
 | `0` | Command completed successfully, including runs with audit findings (dirty repos, branch drift, unknown folders, missing config dotfile) |
-| `1` | Command failed due to configuration error, authentication/API failure, or other operational error |
+| `1` | Invalid argument combinations, configuration errors, authentication/API failures, repository operation or cleanup failures, or collisions reported in any mode |
+| `2` | Invalid flag syntax or unknown flags |
 
-Audit findings are user-facing warnings, not command failures.
+Dirty repositories, branch drift, unknown folders, and protected archived clones are findings rather than command failures. Repository operation errors are counted and cause exit code `1` after other repositories finish.
+
+In default and clone modes, `total` is the number of included, non-empty GitHub repositories, even when a mode skips some of them. In status mode, `total` counts existing managed repositories checked. Status summaries include `errors`, and all modes include `empty` when nonzero. Dirty repositories take precedence over branch drift in summary counts; their branch difference is still shown in the repository report.
 
 ## Local Directory Classification
 
@@ -285,12 +288,16 @@ Audit findings are user-facing warnings, not command failures.
 | Classification | Description |
 |---|---|
 | **Managed** | Corresponds to an included GitHub repository. Cloned if missing; synced/audited if present. |
-| **Unknown** | A directory that does not match any repository (included or excluded) in the organization or user account. |
-| **Excluded-but-present** | A directory matching a repository excluded because it is archived or matches an `exclude_repos` pattern. The reason is reported; retained unless explicitly eligible for `--delete-archived`. |
-| **Collision** | A managed repo path exists but is not a usable git clone (e.g., a regular file, non-git directory, or remote mismatch). Reported and skipped. |
+| **Unknown** | A directory that matches neither an included repository nor an archived/name exclusion. Local folders without Git metadata may appear here after visibility or empty-repository filtering. |
+| **Excluded-but-present** | A directory matching an archived repository exclusion or an `exclude_repos` pattern, even if that name is absent from GitHub discovery. The reason is reported; retained unless explicitly eligible for `--delete-archived`. |
+| **Collision** | A managed repo path is a regular file or lacks a `.git` directory (including linked worktrees), or a visible local Git repository is absent from included discovery and archive/name exclusions. Reported and skipped. |
 
 {: .highlight }
-Hidden entries (starting with `.`) are skipped during scanning. The exception being repositories with names that start with a dot, which are valid and processed normally.
+Hidden entries (starting with `.`) are skipped during scanning. Included repositories with names that start with a dot are processed normally. Hidden excluded folders are skipped.
+
+Before processing an existing managed repository in default or status mode, ghorgsync verifies that its origin matches the owner and repository name supplied by GitHub. HTTPS (`https://github.com/OWNER/REPO`), SCP-style SSH (`git@github.com:OWNER/REPO`), and SSH URLs (`ssh://git@github.com/OWNER/REPO`) are accepted, with an optional `.git` suffix and case-insensitive owner/name matching. Custom SSH host aliases, local paths, and other URL forms cannot be verified and are rejected. An `identity-error` leaves the repository untouched, skips cleanup even with `--clean`, and causes exit code `1`. Clone-only mode does not inspect existing managed repositories.
+
+Visible local Git repositories whose folder names are not included in discovery or an explicit archive/name exclusion are reported as collisions and left untouched in all modes. This includes repositories unavailable to the current credentials or omitted by visibility/empty-repository filtering; ghorgsync cannot establish their membership from discovery. Ordinary unknown folders remain warnings. Explicitly excluded repositories remain excluded findings.
 
 ## Archived Repositories
 
@@ -317,7 +324,7 @@ Output identifies folders that would be deleted, were deleted, or were retained,
 
 A GitHub repository that has never had any commits pushed to it is considered *empty*. **ghorgsync** detects empty repositories in two steps. A non-zero `size` in the GitHub API response guarantees the repository has git history, so no further check is made. A `size` of `0` is ambiguous — the field is reported in KB and truncates, so a repository initialized at creation with just a README also reports `0`, and `default_branch` cannot disambiguate because GitHub sets it at creation even for repositories with no commits — so **ghorgsync** makes one additional call to the commits endpoint for such repositories: a `409` response ("Git Repository is empty") marks the repository as empty, while any other outcome leaves it included so a transient failure never suppresses a clone.
 
-Empty repositories are silently skipped — they are not cloned, not synced, and do not count towards the total. When one or more empty repositories are encountered, the final summary line includes an `empty: N` counter. No local action is taken for empty repositories.
+Empty repositories receive no individual empty-repository message — they are not cloned, not synced, and do not count towards the total. When one or more empty repositories are encountered, the final summary line includes an `empty: N` counter. They receive no clone or sync action; a visible local folder may still be reported as unknown (without Git metadata) or as a collision (with Git metadata) during directory auditing.
 
 This detection requires at most one additional API call per zero-size repository; repositories with a non-zero size need no extra calls.
 
@@ -331,7 +338,7 @@ Internal visibility is available only to organizations associated with a GitHub 
 
 When `user` is set in the configuration, **ghorgsync** automatically detects whether the configured username matches the authenticated token owner:
 
-- **Matching user:** `GET /user/repos?affiliation=owner` is called, which returns repositories owned by the authenticated user, including private repositories when `include_private` is `true` (the default). Repositories available only through collaboration or organization membership are not included.
+- **Matching user (case-insensitive):** `GET /user/repos?affiliation=owner` is called, which returns repositories owned by the authenticated user, including private repositories when `include_private` is `true` (the default). Repositories available only through collaboration or organization membership are not included.
 - **Different user:** `GET /users/{username}/repos` is called, which returns only public repositories for that user. If `include_private` is `true` (or not explicitly set), a verbose-level warning is emitted to indicate that private repositories cannot be fetched for a third-party user account.
 
 This detection happens at runtime on each invocation using a cached call to `GET /user`.
