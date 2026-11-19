@@ -94,7 +94,7 @@ Exclude specific repos by exact name and regex patterns:
 ```yaml
 organization: my-org
 exclude_repos:
-  - legacy-repo
+  - "^legacy-repo$"
   - "^sandbox-"
   - "-archive$"
   - "^test-.*-tmp$"
@@ -126,7 +126,7 @@ The examples below show the stable log lines and summary output. In an interacti
   repo   3/10 [█████████████████▋                                         ]  30%
 ```
 
-The transient progress line is omitted from the remaining examples below for readability.
+The startup `workers: N` line and transient progress line are omitted from the remaining examples below for readability.
 
 ### Clean Run
 
@@ -142,8 +142,8 @@ Summary:
 When new repositories are found in the organization that don't exist locally:
 
 ```
-  repo  my-app  [cloned]
-  repo  api-service  [cloned]
+  repo my-app [cloned]
+  repo api-service [cloned]
 
 Summary:
   total: 5 | cloned: 2 | updated: 0 | dirty: 0 | branch-drift: 0 | unknown: 0 | excluded-but-present: 0 | errors: 0
@@ -154,7 +154,7 @@ Summary:
 When existing repositories have new commits on their default branch:
 
 ```
-  repo  api-service  [updated]
+  repo api-service [updated]
 
 Summary:
   total: 5 | cloned: 0 | updated: 1 | dirty: 0 | branch-drift: 0 | unknown: 0 | excluded-but-present: 0 | errors: 0
@@ -165,7 +165,7 @@ Summary:
 When a repository has staged or unstaged changes, checkout and pull are skipped:
 
 ```
-  repo  web-frontend  [dirty] on feature-branch (default: main)
+  repo web-frontend [dirty] on feature-branch (default: main)
        checkout/pull skipped due to dirty working tree
        [unstaged] src/index.ts
        [staged] package.json
@@ -187,7 +187,7 @@ The output shows:
 When a clean repository is not on its default branch, **ghorgsync** checks out the default branch and pulls:
 
 ```
-  repo  docs-site  [branch-drift: checked out main, updated]
+  repo docs-site [branch-drift: checked out main, updated]
 
 Summary:
   total: 5 | cloned: 0 | updated: 1 | dirty: 0 | branch-drift: 1 | unknown: 0 | excluded-but-present: 0 | errors: 0
@@ -196,7 +196,7 @@ Summary:
 If the repository was dirty and on the wrong branch, drift is reported but no correction is made:
 
 ```
-  repo  docs-site  [dirty] on feature-docs (default: main)
+  repo docs-site [dirty] on feature-docs (default: main)
        checkout/pull skipped due to dirty working tree
        [unstaged] docs/guide.md
        +8 -2 lines
@@ -207,21 +207,35 @@ Summary:
 
 ### Unknown Folder Warning
 
-When a directory exists locally that doesn't correspond to any repository in the organization:
+When an ordinary folder without Git metadata does not correspond to any repository in the organization:
 
 ```
-  folder  personal-project  [unknown]
+  folder scratch-notes [unknown]
 
 Summary:
   total: 5 | cloned: 0 | updated: 0 | dirty: 0 | branch-drift: 0 | unknown: 1 | excluded-but-present: 0 | errors: 0
 ```
+
+A local Git repository outside included discovery is an error instead:
+
+```
+  repo personal-project [collision] local git repository is not included in GitHub discovery; left untouched
+```
+
+A folder named like an included repository whose origin points to a different owner or repository is also left untouched:
+
+```
+  repo api-service [identity-error] origin does not match GitHub repository my-org/api-service; repository left untouched
+```
+
+Both cases increment `errors` and cause exit code `1`. Explicit archive/name exclusions remain retained findings.
 
 ### Excluded-but-Present Warning
 
 When a directory exists locally for a repository that is excluded by configuration:
 
 ```
-  repo  old-tool  [excluded: name matches exclude_repos; local folder retained]
+  repo old-tool [excluded: name matches exclude_repos; local folder retained]
 
 Summary:
   total: 5 | cloned: 0 | updated: 0 | dirty: 0 | branch-drift: 0 | unknown: 0 | excluded-but-present: 1 | errors: 0
@@ -232,19 +246,19 @@ Summary:
 A typical run with multiple findings:
 
 ```
-  repo  my-app  [cloned]
-  repo  api-service  [updated]
-  repo  web-frontend  [dirty] on feature-branch (default: main)
+  repo my-app [cloned]
+  repo api-service [updated]
+  repo web-frontend [dirty] on feature-branch (default: main)
        checkout/pull skipped due to dirty working tree
        [unstaged] src/index.ts
        [staged] package.json
        +15 -3 lines
-  repo  docs-site  [branch-drift: checked out main, updated]
-  folder  personal-project  [unknown]
-  repo  old-tool  [excluded: name matches exclude_repos; local folder retained]
+  repo docs-site [branch-drift: checked out main, updated]
+  folder scratch-notes [unknown]
+  repo old-tool [excluded: name matches exclude_repos; local folder retained]
 
 Summary:
-  total: 8 | cloned: 1 | updated: 1 | dirty: 1 | branch-drift: 1 | unknown: 1 | excluded-but-present: 1 | errors: 0
+  total: 8 | cloned: 1 | updated: 2 | dirty: 1 | branch-drift: 1 | unknown: 1 | excluded-but-present: 1 | errors: 0
 ```
 
 ### Clone-Only Mode
@@ -253,14 +267,14 @@ Using `--clone` to quickly clone only missing repositories without processing ex
 
 ```
 $ ghorgsync --clone
-  repo  new-service  [cloned]
-  repo  new-library  [cloned]
+  repo new-service [cloned]
+  repo new-library [cloned]
 
 Summary:
   total: 10 | cloned: 2 | updated: 0 | dirty: 0 | branch-drift: 0 | unknown: 0 | excluded-but-present: 0 | errors: 0
 ```
 
-When all repositories are already cloned locally, `--clone` finishes quickly with no output:
+When all repositories are already cloned locally, `--clone` prints only startup information and a summary:
 
 ```
 $ ghorgsync --clone
@@ -269,7 +283,7 @@ Summary:
   total: 10 | cloned: 0 | updated: 0 | dirty: 0 | branch-drift: 0 | unknown: 0 | excluded-but-present: 0 | errors: 0
 ```
 
-This mode skips all per-repository processing (fetch, dirty check, checkout, pull) and directory auditing (collisions, unknown folders, excluded-but-present), making it significantly faster when you only need to pull down new repositories.
+This mode skips all per-repository processing (fetch, dirty check, checkout, pull) and unknown/excluded folder auditing, making it significantly faster when you only need to pull down new repositories.
 
 ### Status Mode
 
@@ -277,13 +291,13 @@ Using `--status` to check which repositories are dirty or not on their default b
 
 ```
 $ ghorgsync --status
-  repo  web-frontend  [dirty] on feature-branch (default: main)
+  repo web-frontend [dirty] on feature-branch (default: main)
         M src/index.ts
        ?? new-file.txt
-  repo  docs-site  [branch-drift] on feature-docs (default: main)
+  repo docs-site [branch-drift] on feature-docs (default: main)
 
 Summary:
-  total: 10 | dirty: 1 | branch-drift: 1
+  total: 10 | dirty: 1 | branch-drift: 1 | errors: 0
 ```
 
 The file status lines show the output of `git status --short` with its native color coding. The two-character prefix (`M`, `??`, `A`, etc.) follows git's standard format where the first column indicates staged changes and the second column indicates unstaged changes.
@@ -294,20 +308,22 @@ When all repositories are clean and on their default branches, `--status` produc
 $ ghorgsync --status
 
 Summary:
-  total: 10 | dirty: 0 | branch-drift: 0
+  total: 10 | dirty: 0 | branch-drift: 0 | errors: 0
 ```
 
 A dirty repository on a non-default branch is reported as dirty (not branch-drift):
 
 ```
 $ ghorgsync --status
-  repo  web-frontend  [dirty] on feature-branch (default: main)
+  repo web-frontend [dirty] on feature-branch (default: main)
         M src/index.ts
        A  staged-file.ts
 
 Summary:
-  total: 10 | dirty: 1 | branch-drift: 0
+  total: 10 | dirty: 1 | branch-drift: 0 | errors: 0
 ```
+
+Path collisions and unrelated local Git repositories are still reported as errors.
 
 This mode performs no git operations that modify repositories — no fetch, checkout, or pull. It is purely read-only and safe to run at any time.
 
@@ -317,18 +333,18 @@ Use `--clean` after the normal sync to remove ignored build artifacts and caches
 
 ```
 $ ghorgsync --clean
-  repo  web-frontend  [updated]
-  repo  web-frontend  [cleanup: 42 files, 18.4 MiB would be removed]
+  repo web-frontend [updated]
+  repo web-frontend [cleanup: 42 files, 18.4 MiB would be removed]
 
 Summary:
   total: 10 | cloned: 0 | updated: 1 | dirty: 0 | branch-drift: 0 | unknown: 0 | excluded-but-present: 0 | errors: 0
 ```
 
-Preview a cleanup without changing anything or being prompted:
+Preview ignored-content removal without prompting (normal sync still runs):
 
 ```
 $ ghorgsync --clean --dry-run
-  repo  web-frontend  [cleanup: 42 files, 18.4 MiB would be removed (dry-run)]
+  repo web-frontend [cleanup: 42 files, 18.4 MiB would be removed (dry-run)]
 ```
 
 `--clean` runs non-interactively; `--force` is not required. Add `--verbose` to either command to list every path that would be removed (dry run) or that was removed (cleanup).
@@ -340,7 +356,7 @@ $ ghorgsync --clean --dry-run
 If you run **ghorgsync** in a directory without a `.ghorgsync` file:
 
 ```
-No .ghorgsync configuration file found in the current directory.
+No .ghorgsync configuration file found in current directory. Nothing to do.
 ```
 
 The command exits with code `0`. Create a `.ghorgsync` file with either an `organization` or `user` field to proceed.
@@ -350,7 +366,7 @@ The command exits with code `0`. Create a `.ghorgsync` file with either an `orga
 If no GitHub token is available and the `gh` CLI is not authenticated:
 
 ```
-  system  auth  [error] failed to list repositories: 401 Unauthorized
+  system authentication GitHub API auth error (HTTP 401): check your token
 ```
 
 Fix by setting a token or authenticating with `gh`:
@@ -366,19 +382,19 @@ gh auth login
 If the configuration file is invalid:
 
 ```
-  system  config  [error] one of organization or user is required
+config error: one of organization or user is required
 ```
 
 ```
-  system  config  [error] organization and user are mutually exclusive; specify one but not both
+config error: organization and user are mutually exclusive; specify one but not both
 ```
 
 ```
-  system  config  [error] invalid exclude pattern "[bad-regex": error parsing regexp: missing closing ]: `[bad-regex`
+config error: invalid exclude_repos pattern "[bad-regex": error parsing regexp: missing closing ]: `[bad-regex`
 ```
 
 ```
-  system  config  [error] at least one of include_public or include_private must be true
+config error: both include_public and include_private are false; no repositories would be included
 ```
 
 These errors exit with code `1`. Fix the `.ghorgsync` file and re-run.
@@ -390,7 +406,7 @@ Repositories that contain git submodules are handled automatically. On clone, su
 If a submodule remote is unreachable, the repository is reported as a `submodule-error`:
 
 ```
-  repo  my-app  [submodule-error] git submodule update: ...
+  repo my-app [submodule-error] git submodule update: ...
 ```
 
 Fix the underlying submodule remote issue (network access, SSH keys, token scope) and re-run.

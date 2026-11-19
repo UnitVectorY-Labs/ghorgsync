@@ -1,6 +1,7 @@
 package output
 
 import (
+	"os"
 	"strings"
 	"testing"
 )
@@ -63,5 +64,35 @@ func TestShouldColor_WithNoColorEnv(t *testing.T) {
 	t.Setenv("NO_COLOR", "1")
 	if ShouldColor() {
 		t.Error("should return false when NO_COLOR is set")
+	}
+}
+
+func TestStatusOutputColorAndErrorSummary(t *testing.T) {
+	for _, color := range []bool{false, true} {
+		t.Run(map[bool]string{false: "plain", true: "color"}[color], func(t *testing.T) {
+			file, err := os.CreateTemp(t.TempDir(), "output")
+			if err != nil {
+				t.Fatal(err)
+			}
+			original := os.Stdout
+			os.Stdout = file
+			defer func() { os.Stdout = original; file.Close() }()
+			p := NewPrinter(color, 0, true)
+			p.RepoStatusDirty("app", "topic", "main", "\x1b[31m M\x1b[m app.go\n")
+			p.StatusSummary(2, 1, 0, 1, 3)
+			data, err := os.ReadFile(file.Name())
+			if err != nil {
+				t.Fatal(err)
+			}
+			out := string(data)
+			if strings.Contains(out, "\x1b[") != color {
+				t.Errorf("unexpected color output: %q", out)
+			}
+			for _, want := range []string{"app.go", "default: main", "total: 2", "errors: 1", "empty: 3"} {
+				if !strings.Contains(out, want) {
+					t.Errorf("output missing %q: %q", want, out)
+				}
+			}
+		})
 	}
 }

@@ -16,7 +16,7 @@ Clone and update all organization or user account repositories in one folder, wi
 - **One command sync** — clones missing repos, fetches and pulls existing ones
 - **Parallel repository processing** — defaults to four times the logical CPU count, capped at 32; tune with `--workers` or `GHORGSYNC_WORKERS` ([details](USAGE.md#repository-concurrency))
 - **Organization and user accounts** — sync repos from a GitHub organization or a personal user account
-- **Non-destructive** — never deletes directories, discards local changes, or runs destructive git commands
+- **Non-destructive by default** — preserves local changes; deletion requires explicit cleanup or archived-removal flags
 - **Dirty repo detection** — reports staged/unstaged changes with file details and line counts
 - **Branch drift audit** — detects and corrects default branch drift on clean repos
 - **Stray content warnings** — identifies unknown folders and explains excluded local repos (including archived repos)

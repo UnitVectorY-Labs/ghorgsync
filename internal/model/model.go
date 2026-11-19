@@ -15,10 +15,10 @@ type RepoInfo struct {
 type LocalClassification int
 
 const (
-	ClassManaged           LocalClassification = iota // Matches an included repo
-	ClassUnknown                                      // No matching repo (included or excluded)
-	ClassExcludedButPresent                           // Matches an excluded repo name/pattern
-	ClassCollision                                    // Path exists but is not a valid clone
+	ClassManaged            LocalClassification = iota // Matches an included repo
+	ClassUnknown                                       // No matching repo (included or excluded)
+	ClassExcludedButPresent                            // Matches an excluded repo name/pattern
+	ClassCollision                                     // Path exists but is not a valid clone
 )
 
 // String returns a human-readable name for the classification.
@@ -41,17 +41,18 @@ func (c LocalClassification) String() string {
 type RepoAction int
 
 const (
-	ActionNone          RepoAction = iota
-	ActionCloned                   // Repository was cloned
-	ActionUpdated                  // Repository was pulled with new changes
-	ActionAlreadyCurrent           // Repository was already up to date
-	ActionDirty                    // Repository has uncommitted changes
-	ActionBranchDrift              // Repository was on wrong branch (checkout performed)
-	ActionCloneError               // Clone failed
-	ActionFetchError               // Fetch failed
-	ActionCheckoutError            // Checkout failed
-	ActionPullError                // Pull failed
-	ActionSubmoduleError           // Submodule update failed
+	ActionNone           RepoAction = iota
+	ActionCloned                    // Repository was cloned
+	ActionUpdated                   // Repository was pulled with new changes
+	ActionAlreadyCurrent            // Repository was already up to date
+	ActionDirty                     // Repository has uncommitted changes
+	ActionBranchDrift               // Repository was on wrong branch (checkout performed)
+	ActionCloneError                // Clone failed
+	ActionFetchError                // Fetch failed
+	ActionCheckoutError             // Checkout failed
+	ActionPullError                 // Pull failed
+	ActionSubmoduleError            // Submodule update failed
+	ActionIdentityError             // Origin does not match GitHub metadata
 )
 
 // String returns a human-readable name for the action.
@@ -77,6 +78,8 @@ func (a RepoAction) String() string {
 		return "checkout-error"
 	case ActionPullError:
 		return "pull-error"
+	case ActionIdentityError:
+		return "identity-error"
 	case ActionSubmoduleError:
 		return "submodule-error"
 	default:

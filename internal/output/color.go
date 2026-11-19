@@ -3,6 +3,7 @@ package output
 import (
 	"fmt"
 	"os"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -92,11 +93,7 @@ func NewPrinter(color bool, verbosity int, noProgress bool) *Printer {
 
 // IsTerminalOutput returns true when stdout is a terminal.
 func IsTerminalOutput() bool {
-	fi, err := os.Stdout.Stat()
-	if err != nil {
-		return false
-	}
-	return fi.Mode()&os.ModeCharDevice != 0
+	return term.IsTerminal(int(os.Stdout.Fd()))
 }
 
 // ShouldColor returns true if color output is enabled.
@@ -472,8 +469,13 @@ func (p *Printer) SystemError(context string, err error) {
 	})
 }
 
+var statusColorCodes = regexp.MustCompile(`\x1b\[[0-9;]*m`)
+
 // RepoStatusDirty prints a dirty repo in status mode with colorized git status output.
 func (p *Printer) RepoStatusDirty(name, currentBranch, defaultBranch, statusOutput string) {
+	if !p.color {
+		statusOutput = statusColorCodes.ReplaceAllString(statusOutput, "")
+	}
 	branchInfo := currentBranch
 	if currentBranch != defaultBranch {
 		branchInfo = currentBranch + " (default: " + defaultBranch + ")"
@@ -506,7 +508,7 @@ func (p *Printer) RepoStatusBranchDrift(name, currentBranch, defaultBranch strin
 }
 
 // StatusSummary prints the summary line for status mode.
-func (p *Printer) StatusSummary(total, dirty, branchDrift int) {
+func (p *Printer) StatusSummary(total, dirty, branchDrift, errors, empty int) {
 	p.withProgressSuspended(func() {
 		fmt.Println()
 		fmt.Println(p.colorize(bold, "Summary:"))
@@ -526,6 +528,10 @@ func (p *Printer) StatusSummary(total, dirty, branchDrift int) {
 			parts = append(parts, fmt.Sprintf("branch-drift: %d", branchDrift))
 		}
 
+		parts = append(parts, p.colorizeErrorCount(errors))
+		if empty > 0 {
+			parts = append(parts, fmt.Sprintf("empty: %d", empty))
+		}
 		fmt.Println("  " + strings.Join(parts, " | "))
 	})
 }
@@ -646,4 +652,12 @@ func (p *Printer) ArchivedTotals(deleted, planned, retained int) {
 	p.withProgressSuspended(func() {
 		fmt.Println(p.colorize(gray, fmt.Sprintf("  archived folders: deleted: %d | would-delete: %d | retained: %d", deleted, planned, retained)))
 	})
+}
+
+func (p *Printer) colorizeErrorCount(count int) string {
+	text := fmt.Sprintf("errors: %d", count)
+	if count > 0 {
+		return p.colorize(red, text)
+	}
+	return text
 }

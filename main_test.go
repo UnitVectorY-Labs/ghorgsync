@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"flag"
 	"runtime"
 	"strings"
 	"testing"
@@ -56,6 +58,31 @@ func TestValidateDeletionFlags(t *testing.T) {
 		wantError := deletion && (clone || status || clean)
 		if (err != nil) != wantError {
 			t.Errorf("flags %04b: error = %v, want error %v", mask, err, wantError)
+		}
+	}
+}
+
+func TestUsageSafetyBoundaries(t *testing.T) {
+	var out bytes.Buffer
+	flags := flag.NewFlagSet("ghorgsync", flag.ContinueOnError)
+	flags.SetOutput(&out)
+	flags.Bool("status", false, "Show local status")
+	printUsage(&out, flags)
+	for _, want := range []string{"Usage: ghorgsync [flags]", ".ghorgsync", "only reads local state", "normal sync still runs", "--force", "-status"} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("help missing %q", want)
+		}
+	}
+}
+
+func TestOperationalExitCode(t *testing.T) {
+	for _, count := range []int{0, 1, 3} {
+		want := 0
+		if count > 0 {
+			want = 1
+		}
+		if got := operationalExitCode(count); got != want {
+			t.Errorf("errors=%d: exit=%d, want %d", count, got, want)
 		}
 	}
 }

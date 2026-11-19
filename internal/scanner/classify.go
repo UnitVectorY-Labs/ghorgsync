@@ -42,6 +42,10 @@ func ClassifyEntry(name string, isDir bool, isGitRepo bool, includedSet map[stri
 		}
 	}
 
+	if isGitRepo {
+		return model.LocalEntry{Name: name, Classification: model.ClassCollision, Detail: "local git repository is not included in GitHub discovery; left untouched"}
+	}
+
 	return model.LocalEntry{
 		Name:           name,
 		Classification: model.ClassUnknown,

@@ -1,6 +1,7 @@
 package sync
 
 import (
+	"fmt"
 	"path/filepath"
 
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/model"
@@ -57,9 +58,10 @@ func (e *Engine) CloneRepo(repo model.RepoInfo) model.RepoResult {
 // ProcessRepo audits and syncs an existing local repository.
 func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 	repoDir := filepath.Join(e.BaseDir, repo.Name)
-	result := model.RepoResult{
-		Name:          repo.Name,
-		DefaultBranch: repo.DefaultBranch,
+	// Check identity before fetch, submodule updates, or working-tree inspection.
+	result := e.verifyIdentity(repoDir, repo)
+	if result.Error != nil {
+		return result
 	}
 
 	// Always fetch (safe operation)
@@ -123,12 +125,13 @@ func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 		return result
 	}
 
-	// Update submodule pointers after pull to keep them in sync with the new commits.
-	// This is non-fatal: if submodule update fails after a successful pull, we still
-	// report the pull result and the error will surface on the next sync cycle.
-	_ = e.Git.SubmoduleUpdate(repoDir)
-
 	result.Updated = changed
+	// A successful pull does not guarantee that submodules updated successfully.
+	if err := e.Git.SubmoduleUpdate(repoDir); err != nil {
+		result.Action = model.ActionSubmoduleError
+		result.Error = fmt.Errorf("pull completed; updating submodules: %w", err)
+		return result
+	}
 
 	if changed {
 		if result.BranchDrift {
@@ -153,9 +156,10 @@ func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 // if the repo is clean and on the default branch.
 func (e *Engine) StatusRepo(repo model.RepoInfo) model.RepoResult {
 	repoDir := filepath.Join(e.BaseDir, repo.Name)
-	result := model.RepoResult{
-		Name:          repo.Name,
-		DefaultBranch: repo.DefaultBranch,
+	// Check identity before fetch, submodule updates, or working-tree inspection.
+	result := e.verifyIdentity(repoDir, repo)
+	if result.Error != nil {
+		return result
 	}
 
 	// Get current branch
@@ -193,4 +197,9 @@ func (e *Engine) StatusRepo(repo model.RepoInfo) model.RepoResult {
 
 	result.Action = model.ActionAlreadyCurrent
 	return result
+}
+
+func (e *Engine) verifyIdentity(repoDir string, repo model.RepoInfo) model.RepoResult {
+	remote, err := e.Git.RemoteURL(repoDir)
+	return identityResult(repo, remote, err)
 }
