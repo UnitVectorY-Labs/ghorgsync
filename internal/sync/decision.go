@@ -1,8 +1,10 @@
 package sync
 
 import (
+	"fmt"
 	"strings"
 
+	"github.com/UnitVectorY-Labs/ghorgsync/internal/gitidentity"
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/model"
 )
 
@@ -74,4 +76,23 @@ func splitLines(s string) []string {
 		lines = append(lines, s[start:])
 	}
 	return lines
+}
+
+// identityResult is the shared, pure identity gate for sync and status. Only a
+// result without an error may proceed to further repository operations.
+func identityResult(repo model.RepoInfo, remote string, readErr error) model.RepoResult {
+	result := model.RepoResult{Name: repo.Name, DefaultBranch: repo.DefaultBranch}
+	if readErr != nil {
+		result.Error = fmt.Errorf("cannot verify origin; repository left untouched: %w", readErr)
+	} else if !gitidentity.MatchRemote(remote, repo.CloneURL) {
+		expected := gitidentity.Repository(repo.CloneURL)
+		if expected == "" {
+			expected = "(unverifiable GitHub metadata)"
+		}
+		result.Error = fmt.Errorf("origin does not match GitHub repository %s; repository left untouched", expected)
+	}
+	if result.Error != nil {
+		result.Action = model.ActionIdentityError
+	}
+	return result
 }

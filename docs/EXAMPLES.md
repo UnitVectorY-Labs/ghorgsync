@@ -225,7 +225,7 @@ A local Git repository outside included discovery is an error instead:
 A folder named like an included repository whose origin points to a different owner or repository is also left untouched:
 
 ```
-  repo api-service [identity-error] origin does not match GitHub repository api-service; repository left untouched
+  repo api-service [identity-error] origin does not match GitHub repository my-org/api-service; repository left untouched
 ```
 
 Both cases increment `errors` and cause exit code `1`. Explicit archive/name exclusions remain retained findings.

@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"path/filepath"
 
-	"github.com/UnitVectorY-Labs/ghorgsync/internal/gitidentity"
 	"github.com/UnitVectorY-Labs/ghorgsync/internal/model"
 )
 
@@ -59,15 +58,9 @@ func (e *Engine) CloneRepo(repo model.RepoInfo) model.RepoResult {
 // ProcessRepo audits and syncs an existing local repository.
 func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 	repoDir := filepath.Join(e.BaseDir, repo.Name)
-	result := model.RepoResult{
-		Name:          repo.Name,
-		DefaultBranch: repo.DefaultBranch,
-	}
-
 	// Check identity before fetch, submodule updates, or working-tree inspection.
-	if err := e.verifyIdentity(repoDir, repo); err != nil {
-		result.Action = model.ActionIdentityError
-		result.Error = err
+	result := e.verifyIdentity(repoDir, repo)
+	if result.Error != nil {
 		return result
 	}
 
@@ -163,15 +156,9 @@ func (e *Engine) ProcessRepo(repo model.RepoInfo) model.RepoResult {
 // if the repo is clean and on the default branch.
 func (e *Engine) StatusRepo(repo model.RepoInfo) model.RepoResult {
 	repoDir := filepath.Join(e.BaseDir, repo.Name)
-	result := model.RepoResult{
-		Name:          repo.Name,
-		DefaultBranch: repo.DefaultBranch,
-	}
-
 	// Check identity before fetch, submodule updates, or working-tree inspection.
-	if err := e.verifyIdentity(repoDir, repo); err != nil {
-		result.Action = model.ActionIdentityError
-		result.Error = err
+	result := e.verifyIdentity(repoDir, repo)
+	if result.Error != nil {
 		return result
 	}
 
@@ -212,13 +199,7 @@ func (e *Engine) StatusRepo(repo model.RepoInfo) model.RepoResult {
 	return result
 }
 
-func (e *Engine) verifyIdentity(repoDir string, repo model.RepoInfo) error {
+func (e *Engine) verifyIdentity(repoDir string, repo model.RepoInfo) model.RepoResult {
 	remote, err := e.Git.RemoteURL(repoDir)
-	if err != nil {
-		return fmt.Errorf("cannot verify origin; repository left untouched: %w", err)
-	}
-	if !gitidentity.MatchRemote(remote, repo.CloneURL) {
-		return fmt.Errorf("origin does not match GitHub repository %s; repository left untouched", repo.Name)
-	}
-	return nil
+	return identityResult(repo, remote, err)
 }
